@@ -1,0 +1,61 @@
+{
+  "name": "studmanbackend",
+  "version": "1.0.0",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "cross-env NODE_ENV=production node src/server.js",
+    "vercel-build": "echo 'Building for Vercel'",
+    "seed:superadmin": "node scripts/seedSuperAdmin.js",
+    "dev": "nodemon --watch src --exec \"node --enable-source-maps src/server.js\"",
+    "deploy": "vercel --prod",
+    "lint": "eslint . --ext .js,.cjs,.mjs",
+    "format": "prettier --write .",
+    "test": "NODE_OPTIONS=\"--experimental-vm-modules\" jest",
+    "test:watch": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --watch",
+    "test:coverage": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --coverage",
+    "test:debug": "NODE_OPTIONS=\"--experimental-vm-modules\" node --inspect-brk node_modules/.bin/jest --runInBand",
+    "test:verbose": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --verbose"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "vercel",
+    "serverless"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "Node.js Express API deployed on Vercel",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cloudinary": "^2.8.0",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "cross-env": "^10.0.0",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.1.0",
+    "joi": "^18.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.18.1",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.28.5",
+    "babel-jest": "^30.2.0",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-node": "^11.1.0",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.10",
+    "prettier": "^3.6.2",
+    "supertest": "^7.1.4"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
