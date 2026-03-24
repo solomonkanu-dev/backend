@@ -3,6 +3,8 @@ import Result from "../models/Result.js";
 import Subject from "../models/Subject.js";
 import User from "../models/user.js";
 
+const isDev = process.env.NODE_ENV === "development";
+
 export const assignMarks = async (req, res) => {
   try {
     if (!["admin", "lecturer"].includes(req.user.role)) {
@@ -31,6 +33,11 @@ export const assignMarks = async (req, res) => {
 
     if (!subject) {
       return res.status(404).json({ message: "Subject not found" });
+    }
+
+    // Lecturers may only assign marks for subjects they own
+    if (req.user.role === "lecturer" && !subject.lecturer.equals(req.user._id)) {
+      return res.status(403).json({ message: "You are not assigned to this subject" });
     }
 
     if (marksObtained > subject.totalMarks) {
@@ -70,6 +77,6 @@ export const assignMarks = async (req, res) => {
       result,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
   }
 };

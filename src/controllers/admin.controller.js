@@ -7,7 +7,10 @@ import Result from "../models/Result.js";
 import FeeParticular from "../models/Fees.js";
 import Attendance from "../models/Attendance.js";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import logger from "../utils/logger.js";
+
+const isDev = process.env.NODE_ENV === "development";
 
 export const requestAdminSignup = async (req, res) => {
   try {
@@ -30,7 +33,7 @@ export const requestAdminSignup = async (req, res) => {
       message: "Admin signup request submitted. Awaiting approval.",
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
   }
 };
 
@@ -64,7 +67,7 @@ export const createStudent = async (req, res) => {
     }
 
     // 4️⃣ Create temp password
-    const tempPassword = Math.random().toString(36).slice(-8);
+    const tempPassword = randomBytes(12).toString("base64url");
 
     // 5️⃣ Create student
     const student = await User.create({
@@ -90,7 +93,7 @@ export const createStudent = async (req, res) => {
       tempPassword,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
   }
 };
 
@@ -115,9 +118,8 @@ export const createLecturer = async (req, res) => {
     const user = await User.create({
       fullName,
       email,
-      password: Math.random().toString(36).slice(-8),
+      password: randomBytes(12).toString("base64url"),
       role: "lecturer",
-      // class: req.user.class,
       institute: req.user.institute,
       approved: true,
       lecturerProfile,
@@ -129,7 +131,7 @@ export const createLecturer = async (req, res) => {
       user,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
   }
 };
 
@@ -151,65 +153,9 @@ export const updateLecturerProfile = async (req, res) => {
       user,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
   }
 };
-
-// export const createUser = async (req, res) => {
-//   try {
-//     // 🔐 Only admins can create users
-//     if (req.user.role !== 'admin') {
-//       return res.status(403).json({ message: 'Admin access only' });
-//     }
-
-//     if (!req.user.institute) {
-//       return res.status(400).json({
-//         message: 'Create institute before adding users',
-//       });
-//     }
-
-//     const { fullName, email, role } = req.body;
-
-//     // 🔒 Allow only specific roles
-//     const allowedRoles = ['lecturer', 'student'];
-//     if (!allowedRoles.includes(role)) {
-//       return res.status(400).json({
-//         message: 'Invalid role',
-//       });
-//     }
-
-//     const exists = await User.findOne({ email });
-//     if (exists) {
-//       return res.status(409).json({ message: 'User already exists' });
-//     }
-
-//     // 🔑 Generate temp password
-//     const tempPassword = Math.random().toString(36).slice(-8);
-
-//     const user = await User.create({
-//       fullName,
-//       email,
-//       password: tempPassword,
-//       role,
-//       institute: req.user.institute,
-//       approved: true,
-//     //   mustChangePassword: true, // 👈 recommended field
-//     });
-
-//     res.status(201).json({
-//       message: `${role} created successfully`,
-//       user: {
-//         id: user._id,
-//         fullName: user.fullName,
-//         email: user.email,
-//         role: user.role,
-//       },
-//       tempPassword, // send once
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
 
 export const resetPassword = async (req, res) => {
   try {
@@ -224,7 +170,7 @@ export const resetPassword = async (req, res) => {
 
     res.json({ message: "Password reset successfully" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
   }
 };
 
@@ -274,22 +220,40 @@ export const createInstitute = async (req, res) => {
       institute,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
   }
 };
 
 export const getAllStudents = async (req, res) => {
-  const students = await User.find({
-    role: "student",
-    institute: req.user.institute,
-  }).populate("class", "name");
-
-  res.json(students);
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const skip = (page - 1) * limit;
+    const filter = { role: "student", institute: req.user.institute };
+    const [data, total] = await Promise.all([
+      User.find(filter).skip(skip).limit(limit).populate("class", "name"),
+      User.countDocuments(filter),
+    ]);
+    res.json({ data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  } catch (error) {
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+  }
 };
 
 export const getAllLecturers = async (req, res) => {
-  const lecturers = await User.find({ role: "lecturer" });
-  res.json(lecturers);
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const skip = (page - 1) * limit;
+    const filter = { role: "lecturer", institute: req.user.institute };
+    const [data, total] = await Promise.all([
+      User.find(filter).skip(skip).limit(limit),
+      User.countDocuments(filter),
+    ]);
+    res.json({ data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  } catch (error) {
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+  }
 };
 
 export const getLecturerById = async (req, res) => {
@@ -343,7 +307,7 @@ export const getClassById = async (req, res) => {
       totalFemales,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
   }
 };
 
@@ -358,12 +322,21 @@ export const getClassWithStudents = async (req, res) => {
 
 export const getAllClasses = async (req, res) => {
   try {
-    const classes = await Class.find()
-      .populate("lecturer", "fullName email")
-      .populate("students", "fullName email studentProfile");
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const skip = (page - 1) * limit;
+    const filter = { institute: req.user.institute };
+    const [classes, total] = await Promise.all([
+      Class.find(filter)
+        .skip(skip)
+        .limit(limit)
+        .populate("lecturer", "fullName email")
+        .populate("students", "fullName email studentProfile"),
+      Class.countDocuments(filter),
+    ]);
 
     // Add gender statistics
-    const result = classes.map((cls) => {
+    const data = classes.map((cls) => {
       const classObj = cls.toObject();
       const totalMale = classObj.students.filter(
         (student) => student.studentProfile?.gender && student.studentProfile.gender.toLowerCase() === 'male'
@@ -385,9 +358,9 @@ export const getAllClasses = async (req, res) => {
       };
     });
 
-    res.json(result);
+    res.json({ data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
   }
 };
 
@@ -461,45 +434,10 @@ export const getMyInstitute = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Failed to fetch institute",
-      error: error.message,
+      message: isDev ? error.message : "Internal server error",
     });
   }
 };
-
-// export const updateInstitute = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-
-//     const institute = await Institute.findById(id);
-//     if (!institute) {
-//       return res.status(404).json({ message: "Institute not found" });
-//     }
-
-//     // 🔐 Authorization check
-//     if (
-//       req.user.role !== "super_admin" &&
-//       institute.createdBy.toString() !== req.user.id
-//     ) {
-//       return res.status(403).json({
-//         message: "You are not allowed to update this institute",
-//       });
-//     }
-
-//     const updatedInstitute = await Institute.findByIdAndUpdate(
-//       id,
-//       req.body,
-//       { new: true, runValidators: true }
-//     );
-
-//     res.status(200).json({
-//       message: "Institute updated successfully",
-//       data: updatedInstitute,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
 
 export const updateInstitute = async (req, res) => {
   try {
@@ -518,7 +456,7 @@ export const updateInstitute = async (req, res) => {
       data: institute,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
   }
 };
 
@@ -565,7 +503,7 @@ export const createFeeParticular = async (req, res) => {
       fees: createdFees,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
   }
 };
 
@@ -602,30 +540,3 @@ export const attendanceSummary = async (req, res) => {
 
   res.json({ total, present, percentage });
 };
-
-// export const createFeeParticular = async (req, res) => {
-//   try {
-//     const { title, amount } = req.body;
-
-//     // Admin must have an institute
-//     if (!req.user.institute) {
-//       return res.status(400).json({
-//         message: "Create institute before adding fees",
-//       });
-//     }
-
-//     const fee = await FeeParticular.create({
-//       title,
-//       amount,
-//       institute: req.user.institute,
-//       createdBy: req.user.id,
-//     });
-
-//     res.status(201).json({
-//       message: "Fee particular created successfully",
-//       fee,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };

@@ -114,6 +114,8 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+userSchema.index({ institute: 1, role: 1 });
+
 // 🔐 Password Hash
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();

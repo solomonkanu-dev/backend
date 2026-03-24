@@ -24,7 +24,7 @@ const app = express();
 
 // Middlewares
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') || [] }));
 app.use(json({ limit: '10mb' }));
 app.use(urlencoded({ extended: true }));
 app.use(compression());
@@ -37,7 +37,16 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+// Stricter rate limiter for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many attempts, please try again later',
+});
+app.use('/api/v1/auth', authLimiter);
+
 // Routes
+app.get('/health', (req, res) => res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.get('/', (req, res) => res.json({ message: 'API is running' }));
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/auth', authRoutes);

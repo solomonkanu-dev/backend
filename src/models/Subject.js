@@ -41,6 +41,7 @@ const subjectSchema = new mongoose.Schema(
 );
 
 subjectSchema.index({ code: 1, class: 1 }, { unique: true });
+subjectSchema.index({ institute: 1, code: 1 });
 
 
 

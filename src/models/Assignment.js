@@ -10,4 +10,7 @@ const assignmentSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+assignmentSchema.index({ class: 1, subject: 1 });
+
 export default mongoose.model("Assignment", assignmentSchema);

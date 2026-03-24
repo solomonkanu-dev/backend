@@ -54,6 +54,7 @@ const attendanceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+attendanceSchema.index({ class: 1, date: 1 });
 attendanceSchema.index(
   { institute: 1, class: 1, date: 1, type: 1 },
   { unique: true, partialFilterExpression: { type: "student" } }

@@ -3,10 +3,14 @@ import { createLogger, format as _format, transports as _transports } from 'wins
 const logger = createLogger({
   level: 'info',
   format: _format.combine(
-    // _format.timestamp(),
+    _format.timestamp(),
     _format.simple()
   ),
-  transports: [new _transports.Console()],
+  transports: [
+    new _transports.Console(),
+    new _transports.File({ filename: 'logs/error.log', level: 'error' }),
+    new _transports.File({ filename: 'logs/combined.log' }),
+  ],
 });
 
 export default logger;

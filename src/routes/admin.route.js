@@ -1,6 +1,6 @@
 import { Router } from "express";
 import {
-  //   resetUserPassword,
+  resetPassword,
   requestAdminSignup,
   createInstitute,
   getAllStudents,
@@ -17,9 +17,6 @@ import {
   getLecturerById,
   getStudentById,
   getClassById,
-  
-  // resetUserPassword,
-  //   createFeeParticular,
 } from "../controllers/admin.controller.js";
 import auth from "../middlewares/auth.js";
 import { adminOnly } from "../middlewares/adminOnly.js";
@@ -58,7 +55,7 @@ router.patch(
   resetPasswordRules,
   validate,
   (req, res, next) => {
-    resetUserPassword(req, res, next);
+    resetPassword(req, res, next);
   }
 );
 

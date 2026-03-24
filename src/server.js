@@ -4,6 +4,14 @@ import app from './app.js';
 import connectDB from './config/db.js';
 import logger from './utils/logger.js';
 
+const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET'];
+for (const key of requiredEnvVars) {
+  if (!process.env[key]) {
+    console.error(`Missing required environment variable: ${key}`);
+    process.exit(1);
+  }
+}
+
 // Fly.io sets PORT to 8080 by default
 const PORT = process.env.PORT || 8080;
 
