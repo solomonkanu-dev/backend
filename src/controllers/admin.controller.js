@@ -9,6 +9,7 @@ import Attendance from "../models/Attendance.js";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import logger from "../utils/logger.js";
+import { logAudit } from "../utils/audit.js";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -86,6 +87,8 @@ export const createStudent = async (req, res) => {
       $addToSet: { students: student._id }, // prevents duplicates
     });
 
+    logAudit(req, { action: "CREATE_STUDENT", entity: "User", entityId: student._id, description: `Created student ${fullName} (${email})`, statusCode: 201 });
+
     res.status(201).json({
       statusCode: 201,
       message: "Student created successfully",
@@ -124,6 +127,8 @@ export const createLecturer = async (req, res) => {
       approved: true,
       lecturerProfile,
     });
+
+    logAudit(req, { action: "CREATE_LECTURER", entity: "User", entityId: user._id, description: `Created lecturer ${fullName} (${email})`, statusCode: 201 });
 
     res.status(201).json({
       statusCode: 201,
@@ -167,6 +172,8 @@ export const resetPassword = async (req, res) => {
     await User.findByIdAndUpdate(userId, {
       password: hashedPassword,
     });
+
+    logAudit(req, { action: "RESET_PASSWORD", entity: "User", entityId: userId, description: `Reset password for user ${userId}`, statusCode: 200 });
 
     res.json({ message: "Password reset successfully" });
   } catch (error) {
@@ -562,6 +569,8 @@ export const suspendUser = async (req, res) => {
     user.isActive = false;
     await user.save();
 
+    logAudit(req, { action: "SUSPEND_USER", entity: "User", entityId: user._id, description: `Suspended ${user.role} ${user.fullName} (${user.email})`, statusCode: 200 });
+
     res.json({ success: true, message: `${user.role} account suspended successfully` });
   } catch (error) {
     res.status(500).json({ success: false, message: isDev ? error.message : "Internal server error" });
@@ -589,6 +598,8 @@ export const unsuspendUser = async (req, res) => {
     user.isActive = true;
     await user.save();
 
+    logAudit(req, { action: "UNSUSPEND_USER", entity: "User", entityId: user._id, description: `Unsuspended ${user.role} ${user.fullName} (${user.email})`, statusCode: 200 });
+
     res.json({ success: true, message: `${user.role} account unsuspended successfully` });
   } catch (error) {
     res.status(500).json({ success: false, message: isDev ? error.message : "Internal server error" });
@@ -610,6 +621,8 @@ export const deleteUser = async (req, res) => {
     }
 
     await user.deleteOne();
+
+    logAudit(req, { action: "DELETE_USER", entity: "User", entityId: user._id, description: `Deleted ${user.role} ${user.fullName} (${user.email})`, statusCode: 200 });
 
     res.json({ success: true, message: `${user.role} account deleted successfully` });
   } catch (error) {

@@ -8,6 +8,12 @@ import {
   getAllAdmins,
   suspendAdmin,
   unsuspendAdmin,
+  getSystemOverview,
+  getInstituteHealthReport,
+  getGrowthTrends,
+  getFeeRevenueReport,
+  getSalaryExpenditureReport,
+  getInstituteDeepReport,
 } from '../controllers/superAdmin.controller.js';
 import auth from '../middlewares/auth.js';
 import superAdminOnly from '../middlewares/superAdmin.js';
@@ -60,5 +66,13 @@ router.get('/pending-admins', auth, superAdminOnly, getPendingAdmins);
 router.get('/admins', auth, superAdminOnly, getAllAdmins);
 router.patch('/admins/:adminId/suspend', auth, superAdminOnly, suspendAdmin);
 router.patch('/admins/:adminId/unsuspend', auth, superAdminOnly, unsuspendAdmin);
+
+// System-wide monitoring
+router.get('/monitor/overview', auth, superAdminOnly, getSystemOverview);
+router.get('/monitor/institutes', auth, superAdminOnly, getInstituteHealthReport);
+router.get('/monitor/institutes/:instituteId', auth, superAdminOnly, getInstituteDeepReport);
+router.get('/monitor/growth', auth, superAdminOnly, getGrowthTrends);
+router.get('/monitor/fee-revenue', auth, superAdminOnly, getFeeRevenueReport);
+router.get('/monitor/salary-expenditure', auth, superAdminOnly, getSalaryExpenditureReport);
 
 export default router;

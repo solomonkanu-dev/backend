@@ -3,6 +3,7 @@ import Result from "../models/Result.js";
 import Subject from "../models/Subject.js";
 import User from "../models/user.js";
 import { resolveGrade } from "./grading.controller.js";
+import { logAudit } from "../utils/audit.js";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -62,6 +63,8 @@ export const assignMarks = async (req, res) => {
       },
       { upsert: true, new: true }
     );
+
+    logAudit(req, { action: "ASSIGN_MARKS", entity: "Result", entityId: result._id, description: `Assigned ${marksObtained} marks (grade ${grade}) to student ${studentId} for subject ${subjectId}`, statusCode: 200 });
 
     res.status(200).json({
       statusCode: 200,

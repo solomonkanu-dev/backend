@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import User from "../models/user.js";
+import { logAudit } from "../utils/audit.js";
 
 const signToken = (user) => {
   return jwt.sign(
@@ -41,6 +42,8 @@ export const login = async (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 
+  logAudit(req, { action: "LOGIN", entity: "User", entityId: user._id, description: `${user.role} logged in`, statusCode: 200, userOverride: user });
+
   res.json({ statusCode: 200, token, user });
 };
 
@@ -57,5 +60,7 @@ export const logout = (req, res) => {
     path: "/",
     expires: new Date(0),
   });
+  logAudit(req, { action: "LOGOUT", entity: "User", entityId: req.user?._id, description: "User logged out", statusCode: 200 });
+
   res.json({ statusCode: 200, message: "Logged out successfully" });
 };
