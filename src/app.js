@@ -19,6 +19,7 @@ import feeStructureRoutes from './routes/feeStructure.route.js';
 import themeRoutes from './routes/theme.route.js';
 import salaryRoutes from './routes/salary.route.js';
 import accountRoutes from './routes/account.route.js';
+import gradingRoutes from './routes/grading.route.js';
 
 const app = express();
 
@@ -62,6 +63,7 @@ app.use('/api/v1/fees-structure', feeStructureRoutes);
 app.use('/api/v1/salary', salaryRoutes);
 app.use('/api/v1/account', accountRoutes);
 app.use('/api/v1/theme', themeRoutes);
+app.use('/api/v1/grading', gradingRoutes);
 
 // Error handler (last)
 app.use(errorHandler);

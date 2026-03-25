@@ -2,6 +2,7 @@
 import Result from "../models/Result.js";
 import Subject from "../models/Subject.js";
 import User from "../models/user.js";
+import { resolveGrade } from "./grading.controller.js";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -46,16 +47,7 @@ export const assignMarks = async (req, res) => {
         .json({ message: "Marks exceed total marks" });
     }
 
-    const grade =
-      marksObtained >= 70
-        ? "A"
-        : marksObtained >= 60
-        ? "B"
-        : marksObtained >= 50
-        ? "C"
-        : marksObtained >= 40
-        ? "D"
-        : "F";
+    const grade = await resolveGrade(instituteId, marksObtained);
 
     const result = await Result.findOneAndUpdate(
       {
