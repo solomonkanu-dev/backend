@@ -14,6 +14,11 @@ import {
   getFeeRevenueReport,
   getSalaryExpenditureReport,
   getInstituteDeepReport,
+  setAdminUnderReview,
+  approveAdminOnboarding,
+  rejectAdminOnboarding,
+  getAdminOnboardingList,
+  getAdminOnboardingDetail,
 } from '../controllers/superAdmin.controller.js';
 import auth from '../middlewares/auth.js';
 import superAdminOnly from '../middlewares/superAdmin.js';
@@ -66,6 +71,13 @@ router.get('/pending-admins', auth, superAdminOnly, getPendingAdmins);
 router.get('/admins', auth, superAdminOnly, getAllAdmins);
 router.patch('/admins/:adminId/suspend', auth, superAdminOnly, suspendAdmin);
 router.patch('/admins/:adminId/unsuspend', auth, superAdminOnly, unsuspendAdmin);
+
+// Onboarding workflow
+router.get('/onboarding', auth, superAdminOnly, getAdminOnboardingList);
+router.get('/onboarding/:adminId', auth, superAdminOnly, getAdminOnboardingDetail);
+router.patch('/onboarding/:adminId/review', auth, superAdminOnly, setAdminUnderReview);
+router.patch('/onboarding/:adminId/approve', auth, superAdminOnly, approveAdminOnboarding);
+router.patch('/onboarding/:adminId/reject', auth, superAdminOnly, rejectAdminOnboarding);
 
 // System-wide monitoring
 router.get('/monitor/overview', auth, superAdminOnly, getSystemOverview);

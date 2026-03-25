@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import User from '../models/user.js';
 import Institute from '../models/Institute.js';
 import { logAudit } from '../utils/audit.js';
+import { notify } from '../utils/notify.js';
 import StudentFee from '../models/StudentFee.js';
 import Salary from '../models/Salary.js';
 import Attendance from '../models/Attendance.js';
@@ -602,6 +603,163 @@ export const getInstituteDeepReport = async (req, res) => {
         salaries: salaryStats[0] || { totalDisbursed: 0, totalPaid: 0, totalPending: 0 },
       },
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: isDev ? error.message : 'Internal server error' });
+  }
+};
+
+export const setAdminUnderReview = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+
+    const admin = await User.findOne({ _id: adminId, role: 'admin', 'onboarding.status': 'pending' });
+    if (!admin) {
+      return res.status(404).json({ success: false, message: 'Admin not found or not in pending status' });
+    }
+
+    const note = req.body.note || '';
+
+    admin.onboarding.status = 'under_review';
+    admin.onboarding.reviewNote = note;
+    admin.onboarding.transitions.push({
+      from: 'pending',
+      to: 'under_review',
+      changedBy: req.user._id,
+      changedAt: new Date(),
+      note,
+    });
+    await admin.save();
+
+    logAudit(req, { action: 'SET_ADMIN_UNDER_REVIEW', entity: 'User', entityId: admin._id, description: `Set admin ${admin.fullName} (${admin.email}) under review`, statusCode: 200 });
+
+    res.json({ success: true, message: 'Admin set to under review', data: admin });
+  } catch (error) {
+    res.status(500).json({ success: false, message: isDev ? error.message : 'Internal server error' });
+  }
+};
+
+export const approveAdminOnboarding = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    const note = req.body.note || '';
+
+    const admin = await User.findOne({ _id: adminId, role: 'admin' });
+    if (!admin) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+
+    const from = admin.onboarding.status;
+    admin.onboarding.status = 'approved';
+    admin.approved = true;
+    admin.onboarding.transitions.push({
+      from,
+      to: 'approved',
+      changedBy: req.user._id,
+      changedAt: new Date(),
+      note,
+    });
+    await admin.save();
+
+    logAudit(req, { action: 'APPROVE_ADMIN', entity: 'User', entityId: admin._id, description: `Approved admin onboarding for ${admin.fullName} (${admin.email})`, statusCode: 200 });
+
+    notify({
+      recipientId: admin._id,
+      type: 'admin_approved',
+      title: 'Account Approved',
+      message: 'Your admin account has been approved. You can now log in.',
+    });
+
+    res.json({ success: true, message: 'Admin onboarding approved', data: admin });
+  } catch (error) {
+    res.status(500).json({ success: false, message: isDev ? error.message : 'Internal server error' });
+  }
+};
+
+export const rejectAdminOnboarding = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    const { rejectionReason } = req.body;
+
+    if (!rejectionReason) {
+      return res.status(400).json({ success: false, message: 'Rejection reason is required' });
+    }
+
+    const admin = await User.findOne({ _id: adminId, role: 'admin' });
+    if (!admin) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+
+    const from = admin.onboarding.status;
+    admin.onboarding.status = 'rejected';
+    admin.onboarding.rejectionReason = rejectionReason;
+    admin.approved = false;
+    admin.isActive = false;
+    admin.onboarding.transitions.push({
+      from,
+      to: 'rejected',
+      changedBy: req.user._id,
+      changedAt: new Date(),
+      note: rejectionReason,
+    });
+    await admin.save();
+
+    logAudit(req, { action: 'REJECT_ADMIN', entity: 'User', entityId: admin._id, description: `Rejected admin onboarding for ${admin.fullName} (${admin.email}): ${rejectionReason}`, statusCode: 200 });
+
+    notify({
+      recipientId: admin._id,
+      type: 'admin_rejected',
+      title: 'Account Rejected',
+      message: `Your admin account request was rejected. Reason: ${rejectionReason}`,
+    });
+
+    res.json({ success: true, message: 'Admin onboarding rejected', data: admin });
+  } catch (error) {
+    res.status(500).json({ success: false, message: isDev ? error.message : 'Internal server error' });
+  }
+};
+
+export const getAdminOnboardingList = async (req, res) => {
+  try {
+    const { status } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const skip = (page - 1) * limit;
+
+    const filter = { role: 'admin' };
+    if (status) {
+      filter['onboarding.status'] = status;
+    }
+
+    const [data, total] = await Promise.all([
+      User.find(filter)
+        .select('-password')
+        .populate('institute', 'name')
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 }),
+      User.countDocuments(filter),
+    ]);
+
+    res.json({ success: true, data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: isDev ? error.message : 'Internal server error' });
+  }
+};
+
+export const getAdminOnboardingDetail = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+
+    const admin = await User.findOne({ _id: adminId, role: 'admin' })
+      .select('-password')
+      .populate('institute', 'name')
+      .populate('onboarding.transitions.changedBy', 'fullName email role');
+
+    if (!admin) {
+      return res.status(404).json({ success: false, message: 'Admin not found' });
+    }
+
+    res.json({ success: true, data: admin });
   } catch (error) {
     res.status(500).json({ success: false, message: isDev ? error.message : 'Internal server error' });
   }

@@ -25,6 +25,7 @@ import {
 } from "../controllers/admin.controller.js";
 import auth from "../middlewares/auth.js";
 import { adminOnly } from "../middlewares/adminOnly.js";
+import { enforcePlanLimits } from "../middlewares/enforcePlanLimits.js";
 import {
   assignFeeToStudent,
   getStudentsWithFees,
@@ -52,8 +53,8 @@ const router = Router();
 
 router.post("/admin-request", requestAdminSignupRules, validate, requestAdminSignup);
 
-router.post("/create-student", auth, adminOnly, createStudent);
-router.post("/create-lecturer", auth, adminOnly, createLecturer);
+router.post("/create-student", auth, adminOnly, enforcePlanLimits('students'), createStudent);
+router.post("/create-lecturer", auth, adminOnly, enforcePlanLimits('lecturers'), createLecturer);
 
 /**
  * Admin resets password

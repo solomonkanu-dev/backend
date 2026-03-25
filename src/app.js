@@ -21,6 +21,12 @@ import salaryRoutes from './routes/salary.route.js';
 import accountRoutes from './routes/account.route.js';
 import gradingRoutes from './routes/grading.route.js';
 import auditLogRoutes from './routes/auditLog.route.js';
+import announcementRoutes from './routes/announcement.route.js';
+import planRoutes from './routes/plan.route.js';
+import systemConfigRoutes from './routes/systemConfig.route.js';
+import exportRoutes from './routes/export.route.js';
+import notificationRoutes from './routes/notification.route.js';
+import { maintenanceCheck } from './middlewares/maintenanceCheck.js';
 
 const app = express();
 
@@ -47,6 +53,12 @@ const authLimiter = rateLimit({
 });
 app.use('/api/v1/auth', authLimiter);
 
+// Maintenance check — skip super-admin routes and health endpoint
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/v1/super-admin') || req.path === '/health') return next();
+  maintenanceCheck(req, res, next);
+});
+
 // Routes
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.get('/', (req, res) => res.json({ message: 'API is running' }));
@@ -66,6 +78,11 @@ app.use('/api/v1/account', accountRoutes);
 app.use('/api/v1/theme', themeRoutes);
 app.use('/api/v1/grading', gradingRoutes);
 app.use('/api/v1/audit-logs', auditLogRoutes);
+app.use('/api/v1/announcements', announcementRoutes);
+app.use('/api/v1/plans', planRoutes);
+app.use('/api/v1/system', systemConfigRoutes);
+app.use('/api/v1/exports', exportRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 // Error handler (last)
 app.use(errorHandler);

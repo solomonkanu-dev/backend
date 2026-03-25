@@ -12,11 +12,12 @@ import {
 } from "../controllers/class.controller.js";
 import auth from "../middlewares/auth.js";
 import { adminOnly } from "../middlewares/adminOnly.js";
+import { enforcePlanLimits } from "../middlewares/enforcePlanLimits.js";
 import { createClassRules, assignLecturerRules, idParamRule, validate } from "../validators/class.validator.js";
 
 const router = Router();
 
-router.post("/create-class", auth, adminOnly, createClassRules, validate, createClass);
+router.post("/create-class", auth, adminOnly, enforcePlanLimits('classes'), createClassRules, validate, createClass);
 
 router.get("/", auth, adminOnly, getClasses);
 router.get("/admin", auth, adminOnly, getInstituteClasses);

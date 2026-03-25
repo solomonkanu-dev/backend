@@ -10,6 +10,7 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import logger from "../utils/logger.js";
 import { logAudit } from "../utils/audit.js";
+import { notify, notifySuperAdmins } from "../utils/notify.js";
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -21,13 +22,21 @@ export const requestAdminSignup = async (req, res) => {
     if (exists)
       return res.status(409).json({ message: "Email already in use" });
 
-    await User.create({
+    const newUser = await User.create({
       fullName,
       email,
       password,
       role: "admin",
       approved: false,
       institute: null,
+      onboarding: { status: 'pending', submittedAt: new Date() },
+    });
+
+    notifySuperAdmins({
+      type: 'new_admin_signup',
+      title: 'New Admin Signup Request',
+      message: `${fullName} (${email}) has requested admin access`,
+      relatedEntity: { entityType: 'User', entityId: newUser._id },
     });
 
     res.status(201).json({
@@ -88,6 +97,16 @@ export const createStudent = async (req, res) => {
     });
 
     logAudit(req, { action: "CREATE_STUDENT", entity: "User", entityId: student._id, description: `Created student ${fullName} (${email})`, statusCode: 201 });
+
+    const instituteId = req.user.institute?._id || req.user.institute;
+    notify({
+      recipientId: req.user._id,
+      instituteId,
+      type: 'new_student_enrolled',
+      title: 'New Student Enrolled',
+      message: `${fullName} has been enrolled`,
+      relatedEntity: { entityType: 'User', entityId: student._id },
+    });
 
     res.status(201).json({
       statusCode: 201,
@@ -220,6 +239,13 @@ export const createInstitute = async (req, res) => {
     // Attach institute to admin
     await User.findByIdAndUpdate(req.user.id, {
       institute: institute._id,
+    });
+
+    notifySuperAdmins({
+      type: 'institute_created',
+      title: 'New Institute Created',
+      message: `Institute "${name}" has been created`,
+      relatedEntity: { entityType: 'Institute', entityId: institute._id },
     });
 
     res.status(201).json({

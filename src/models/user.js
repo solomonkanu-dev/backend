@@ -1,6 +1,17 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
+const onboardingTransitionSchema = new mongoose.Schema(
+  {
+    from: String,
+    to: String,
+    changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    changedAt: { type: Date, default: Date.now },
+    note: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
 const guardianSchema = new mongoose.Schema(
   {
     guardianName: String,
@@ -109,6 +120,14 @@ const userSchema = new mongoose.Schema(
     lecturerProfile: {
       type: lecturerProfileSchema,
       default: null,
+    },
+
+    onboarding: {
+      status: { type: String, enum: ['pending', 'under_review', 'approved', 'rejected'], default: 'pending' },
+      submittedAt: { type: Date, default: null },
+      reviewNote: { type: String, default: '' },
+      rejectionReason: { type: String, default: '' },
+      transitions: [onboardingTransitionSchema],
     },
   },
   { timestamps: true }

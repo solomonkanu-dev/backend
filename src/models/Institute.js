@@ -1,5 +1,5 @@
 
-import { Schema, model} from 'mongoose';
+import mongoose, { Schema, model} from 'mongoose';
 
 const instituteSchema = new Schema(
   {
@@ -49,6 +49,22 @@ const instituteSchema = new Schema(
       ref: 'User',
       required: true,
       unique: true, // one institute per admin
+    },
+
+    plan: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Plan',
+      default: null,
+    },
+
+    planExpiry: {
+      type: Date,
+      default: null,
+    },
+
+    subscription: {
+      assignedAt: { type: Date },
+      assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     },
   },
   { timestamps: true }
