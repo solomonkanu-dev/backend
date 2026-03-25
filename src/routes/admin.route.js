@@ -19,6 +19,9 @@ import {
   getClassById,
   getLecturerClasses,
   getStudentClasses,
+  suspendUser,
+  unsuspendUser,
+  deleteUser,
 } from "../controllers/admin.controller.js";
 import auth from "../middlewares/auth.js";
 import { adminOnly } from "../middlewares/adminOnly.js";
@@ -125,6 +128,11 @@ router.post("/fees/assign/class", auth, adminOnly, assignFeesToClass);
 router.post("/attendance/assign/class", auth, adminOnly, assignFeesToClass);
 router.post("/fees/assign/class", auth, adminOnly, assignFeesToClass);
 router.post("/result/assign-marks", auth, assignMarks);
+
+// Account management
+router.patch("/users/:userId/suspend", auth, adminOnly, suspendUser);
+router.patch("/users/:userId/unsuspend", auth, adminOnly, unsuspendUser);
+router.delete("/users/:userId", auth, adminOnly, deleteUser);
 
 // Fee analysis
 router.get("/fee-analysis/summary", auth, adminOnly, getFeeSummary);

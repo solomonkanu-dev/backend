@@ -34,7 +34,12 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ message: "User not found" });
     }
 
-    // 5️⃣ Attach user
+    // 5️⃣ Check if account is suspended
+    if (!user.isActive) {
+      return res.status(403).json({ message: "Account has been suspended" });
+    }
+
+    // 6️⃣ Attach user
     req.user = user;
     next();
   } catch (error) {

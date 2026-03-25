@@ -140,6 +140,66 @@ export const getAllInstitutes = async (req, res) => {
   }
 };
 
+export const getAllAdmins = async (req, res) => {
+  try {
+    const admins = await User.find({ role: "admin" })
+      .select("-password")
+      .populate("institute", "name")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, total: admins.length, data: admins });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({ success: false, message: isDev ? error.message : "Internal server error" });
+  }
+};
+
+export const suspendAdmin = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+
+    const admin = await User.findOne({ _id: adminId, role: "admin" });
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found" });
+    }
+
+    if (!admin.isActive) {
+      return res.status(400).json({ success: false, message: "Account is already suspended" });
+    }
+
+    admin.isActive = false;
+    await admin.save();
+
+    res.json({ success: true, message: "Admin account suspended successfully" });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({ success: false, message: isDev ? error.message : "Internal server error" });
+  }
+};
+
+export const unsuspendAdmin = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+
+    const admin = await User.findOne({ _id: adminId, role: "admin" });
+    if (!admin) {
+      return res.status(404).json({ success: false, message: "Admin not found" });
+    }
+
+    if (admin.isActive) {
+      return res.status(400).json({ success: false, message: "Account is already active" });
+    }
+
+    admin.isActive = true;
+    await admin.save();
+
+    res.json({ success: true, message: "Admin account unsuspended successfully" });
+  } catch (error) {
+    const isDev = process.env.NODE_ENV === "development";
+    res.status(500).json({ success: false, message: isDev ? error.message : "Internal server error" });
+  }
+};
+
 export const getInstituteById = async (req, res) => {
   try {
     const institute = await Institute.findById(req.params.id);

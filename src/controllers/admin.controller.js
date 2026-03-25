@@ -540,3 +540,79 @@ export const attendanceSummary = async (req, res) => {
 
   res.json({ total, present, percentage });
 };
+
+export const suspendUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findOne({
+      _id: userId,
+      role: { $in: ["student", "lecturer"] },
+      institute: req.user.institute,
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (!user.isActive) {
+      return res.status(400).json({ success: false, message: "Account is already suspended" });
+    }
+
+    user.isActive = false;
+    await user.save();
+
+    res.json({ success: true, message: `${user.role} account suspended successfully` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: isDev ? error.message : "Internal server error" });
+  }
+};
+
+export const unsuspendUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findOne({
+      _id: userId,
+      role: { $in: ["student", "lecturer"] },
+      institute: req.user.institute,
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (user.isActive) {
+      return res.status(400).json({ success: false, message: "Account is already active" });
+    }
+
+    user.isActive = true;
+    await user.save();
+
+    res.json({ success: true, message: `${user.role} account unsuspended successfully` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: isDev ? error.message : "Internal server error" });
+  }
+};
+
+export const deleteUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findOne({
+      _id: userId,
+      role: { $in: ["student", "lecturer"] },
+      institute: req.user.institute,
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    await user.deleteOne();
+
+    res.json({ success: true, message: `${user.role} account deleted successfully` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: isDev ? error.message : "Internal server error" });
+  }
+};

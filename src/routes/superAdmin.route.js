@@ -3,10 +3,14 @@ import { body, param, validationResult } from 'express-validator';
 import {
   approveAdmin,
   getPendingAdmins,
+  superAdminLogin,
+  getSystemStats,
+  getAllAdmins,
+  suspendAdmin,
+  unsuspendAdmin,
 } from '../controllers/superAdmin.controller.js';
 import auth from '../middlewares/auth.js';
 import superAdminOnly from '../middlewares/superAdmin.js';
-import { superAdminLogin, getSystemStats } from '../controllers/superAdmin.controller.js';
 
 
 const router = Router();
@@ -53,5 +57,8 @@ router.get(
 
 
 router.get('/pending-admins', auth, superAdminOnly, getPendingAdmins);
+router.get('/admins', auth, superAdminOnly, getAllAdmins);
+router.patch('/admins/:adminId/suspend', auth, superAdminOnly, suspendAdmin);
+router.patch('/admins/:adminId/unsuspend', auth, superAdminOnly, unsuspendAdmin);
 
 export default router;
