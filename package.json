@@ -38,12 +38,12 @@
     "express-validator": "^7.2.1",
     "helmet": "^8.1.0",
     "joi": "^18.0.1",
+    "json2csv": "^5.0.7",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.1",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
-    "winston": "^3.17.0",
-    "json2csv": "^5.0.7"
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.28.5",
