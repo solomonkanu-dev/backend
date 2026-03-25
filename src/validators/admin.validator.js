@@ -30,7 +30,7 @@ export const assignFeeToStudentRules = [
 
 export const resetPasswordRules = [
   param('userId').isMongoId().withMessage('Invalid user ID'),
-  body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
 ];
 
 export const validate = (req, res, next) => {

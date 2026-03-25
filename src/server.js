@@ -20,7 +20,7 @@ const PORT = process.env.PORT || 8080;
     await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/myapp');
     const server = createServer(app);
 
-    server.listen(PORT, '0.0.0.0', () => {
+    server.listen(PORT, () => {
       logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'}`);
     });
 

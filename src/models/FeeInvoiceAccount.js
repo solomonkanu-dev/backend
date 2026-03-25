@@ -40,6 +40,5 @@ const feeInvoiceAccountSchema = new mongoose.Schema(
 );
 
 feeInvoiceAccountSchema.index({ institute: 1, isActive: 1 });
-feeInvoiceAccountSchema.index({ bankNo: 1 }, { unique: true });
 
 export default mongoose.model("FeeInvoiceAccount", feeInvoiceAccountSchema);

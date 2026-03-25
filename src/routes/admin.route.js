@@ -17,6 +17,8 @@ import {
   getLecturerById,
   getStudentById,
   getClassById,
+  getLecturerClasses,
+  getStudentClasses,
 } from "../controllers/admin.controller.js";
 import auth from "../middlewares/auth.js";
 import { adminOnly } from "../middlewares/adminOnly.js";
@@ -26,8 +28,6 @@ import {
   getFeesForStudent,
 } from "../controllers/studentFee.controller.js";
 import {
-  getLecturerClasses,
-  getStudentClasses,
   getClassesWithSubjectSummary
 } from "../controllers/class.controller.js";
 import { assignFeesToClass } from "../controllers/classFee.controller.js";

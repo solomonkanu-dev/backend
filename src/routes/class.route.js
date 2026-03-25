@@ -19,14 +19,14 @@ const router = Router();
 router.post("/create-class", auth, adminOnly, createClassRules, validate, createClass);
 
 router.get("/", auth, adminOnly, getClasses);
-router.get("/:id", auth, adminOnly, idParamRule, validate, getClassById);
-router.get("/:classId/students", auth, getStudentByClass);
+router.get("/admin", auth, adminOnly, getInstituteClasses);
+router.get("/lecturer", auth, getLecturerClasses);
+router.get("/student", auth, getStudentClasses);
 
 router.post("/add-student", auth, adminOnly, addStudentToClass);
 
-router.get("/admin", auth, adminOnly, getInstituteClasses);
-router.get("/lecturer", auth, adminOnly, getLecturerClasses);
-router.get("/student", auth, adminOnly, getStudentClasses);
+router.get("/:classId/students", auth, getStudentByClass);
+router.get("/:id", auth, adminOnly, idParamRule, validate, getClassById);
 router.patch(
   "/assign-lecturer",
   auth,

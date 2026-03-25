@@ -18,7 +18,7 @@ const seedSuperAdmin = async () => {
     await User.create({
       fullName: 'System Owner',
       email: 'superadmin@system.com',
-      password: process.env.ADMIN_SIGNUP_CODE,
+      password: "solomon@1234",
       role: 'super_admin',
       approved: true,
     });

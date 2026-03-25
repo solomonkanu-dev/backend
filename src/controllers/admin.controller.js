@@ -160,9 +160,9 @@ export const updateLecturerProfile = async (req, res) => {
 export const resetPassword = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { newPassword } = req.body;
+    const { password } = req.body;
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     await User.findByIdAndUpdate(userId, {
       password: hashedPassword,
