@@ -32,6 +32,13 @@ import {
 } from "../controllers/class.controller.js";
 import { assignFeesToClass } from "../controllers/classFee.controller.js";
 import { assignMarks } from "../controllers/result.controller.js";
+import {
+  getFeeSummary,
+  getFeeByClass,
+  getFeeByStatus,
+  getDefaulters,
+  getCollectionTrend,
+} from "../controllers/feeAnalysis.controller.js";
 import { requestAdminSignupRules, createInstituteRules, feesArrayRules, assignFeeToStudentRules, resetPasswordRules, validate } from "../validators/admin.validator.js";
 
 const router = Router();
@@ -118,5 +125,12 @@ router.post("/fees/assign/class", auth, adminOnly, assignFeesToClass);
 router.post("/attendance/assign/class", auth, adminOnly, assignFeesToClass);
 router.post("/fees/assign/class", auth, adminOnly, assignFeesToClass);
 router.post("/result/assign-marks", auth, assignMarks);
+
+// Fee analysis
+router.get("/fee-analysis/summary", auth, adminOnly, getFeeSummary);
+router.get("/fee-analysis/by-class", auth, adminOnly, getFeeByClass);
+router.get("/fee-analysis/by-status", auth, adminOnly, getFeeByStatus);
+router.get("/fee-analysis/defaulters", auth, adminOnly, getDefaulters);
+router.get("/fee-analysis/collection-trend", auth, adminOnly, getCollectionTrend);
 
 export default router;

@@ -83,6 +83,10 @@ export const getThemeById = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Theme not found' });
     }
 
+    if (req.user?.institute && theme.institute.toString() !== req.user.institute.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
     res.json({ success: true, data: theme });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -122,6 +126,10 @@ export const updateTheme = async (req, res) => {
 
     if (!theme) {
       return res.status(404).json({ success: false, message: 'Theme not found' });
+    }
+
+    if (theme.institute.toString() !== req.user.institute.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
     // Update fields
@@ -165,11 +173,17 @@ export const deleteTheme = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid theme ID' });
     }
 
-    const theme = await Theme.findByIdAndDelete(id);
+    const theme = await Theme.findById(id);
 
     if (!theme) {
       return res.status(404).json({ success: false, message: 'Theme not found' });
     }
+
+    if (theme.institute.toString() !== req.user.institute.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    await theme.deleteOne();
 
     res.json({ success: true, data: theme, message: 'Theme deleted successfully' });
   } catch (error) {
