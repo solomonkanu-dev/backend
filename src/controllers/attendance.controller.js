@@ -4,54 +4,94 @@ import Class from "../models/Class.js";
 import User from "../models/user.js";
 import mongoose from "mongoose";
 
+// GET /attendance/students?classId=&subjectId=
+// Returns all students in the class for marking attendance, along with subject info.
+export const getStudentsForAttendance = async (req, res) => {
+  try {
+    const { classId, subjectId } = req.query;
+
+    if (!classId || !subjectId) {
+      return res.status(400).json({ message: "classId and subjectId are required" });
+    }
+
+    const classDoc = await Class.findOne({ _id: classId, institute: req.user.institute })
+      .populate("students", "fullName email studentProfile")
+      .lean();
+
+    if (!classDoc) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+
+    // Verify the subject belongs to this class
+    const subject = await Subject.findOne({
+      _id: subjectId,
+      class: classId,
+      institute: req.user.institute,
+    }).lean();
+
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found in this class" });
+    }
+
+    // Lecturers can only mark attendance for subjects they teach
+    if (req.user.role === "lecturer" && String(subject.lecturer) !== String(req.user._id)) {
+      return res.status(403).json({ message: "Access denied. You do not teach this subject." });
+    }
+
+    res.json({
+      class: { _id: classDoc._id, name: classDoc.name },
+      subject: { _id: subject._id, name: subject.name, code: subject.code },
+      students: classDoc.students,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 export const markAttendance = async (req, res) => {
   try {
     if (req.user.role !== "lecturer" && req.user.role !== "admin") {
       return res.status(403).json({ message: "Only admins and lecturers can mark attendance" });
     }
 
-    const { subjectId, classId, date, records } = req.body;
+    const { classId, subjectId, date, records } = req.body;
 
-    if ((!subjectId && !classId) || !date || !records?.length) {
-      return res.status(400).json({ message: "Invalid payload" });
+    // Verify the subject belongs to the given class
+    const subject = await Subject.findOne({
+      _id: subjectId,
+      class: classId,
+      institute: req.user.institute,
+    });
+
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found in this class" });
     }
 
-    // Determine class from provided subjectId or classId
-    let classRef = classId;
-
-    if (subjectId) {
-      const subject = await Subject.findOne({
-        _id: subjectId,
-        lecturer: req.user.id,
-        institute: req.user.institute,
-      });
-
-      if (!subject) {
-        return res.status(404).json({ message: "Subject not found or unauthorized" });
-      }
-
-      classRef = subject.class;
+    // Lecturers can only mark attendance for subjects they teach
+    if (req.user.role === "lecturer" && String(subject.lecturer) !== String(req.user._id)) {
+      return res.status(403).json({ message: "Access denied. You do not teach this subject." });
     }
-
 
     const attendanceDate = new Date(date);
 
     const existing = await Attendance.findOne({
-      class: classRef,
+      class: classId,
+      subject: subjectId,
       date: attendanceDate,
       institute: req.user.institute,
     });
 
     if (existing) {
-      return res.status(409).json({ message: "Attendance already marked for this date" });
+      return res.status(409).json({ message: "Attendance already marked for this subject on this date" });
     }
 
     const attendanceDoc = await Attendance.create({
-      class: classRef,
+      class: classId,
+      subject: subjectId,
       institute: req.user.institute,
       date: attendanceDate,
       records: records.map((r) => ({ student: r.studentId, status: r.status })),
-      markedBy: req.user.id,
+      markedBy: req.user._id,
     });
 
     res.status(201).json({ message: "Attendance recorded successfully", data: attendanceDoc });
@@ -107,24 +147,26 @@ export const attendanceSummary = async (req, res) => {
 
 
 export const getSubjectAttendance = async (req, res) => {
-  // Support both subjectId (legacy) and classId
-  const { subjectId, classId, date } = req.query;
+  const { classId, subjectId, date } = req.query;
 
-  let classRef = classId;
-
-  if (subjectId) {
-    const subject = await Subject.findOne({ _id: subjectId, institute: req.user.institute });
-    if (!subject) return res.status(404).json({ message: "Subject not found" });
-    classRef = subject.class;
+  if (!classId || !subjectId) {
+    return res.status(400).json({ message: "classId and subjectId are required" });
   }
 
-  if (!classRef) return res.status(400).json({ message: "classId or subjectId required" });
+  const subject = await Subject.findOne({ _id: subjectId, class: classId, institute: req.user.institute });
+  if (!subject) return res.status(404).json({ message: "Subject not found in this class" });
 
-  const attendance = await Attendance.find({
-    class: classRef,
-    ...(date && { date: new Date(date) }),
+  const query = {
+    class: classId,
+    subject: subjectId,
     institute: req.user.institute,
-  }).populate("records.student", "fullName");
+    ...(date && { date: new Date(date) }),
+  };
+
+  const attendance = await Attendance.find(query)
+    .populate("records.student", "fullName studentProfile")
+    .populate("subject", "name code")
+    .sort({ date: -1 });
 
   res.json(attendance);
 };

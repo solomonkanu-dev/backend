@@ -13,6 +13,11 @@ const attendanceSchema = new mongoose.Schema(
       ref: "Class",
       default: null,
     },
+    subject: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Subject",
+      default: null,
+    },
     lecturer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -54,9 +59,9 @@ const attendanceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-attendanceSchema.index({ class: 1, date: 1 });
+attendanceSchema.index({ class: 1, subject: 1, date: 1 });
 attendanceSchema.index(
-  { institute: 1, class: 1, date: 1, type: 1 },
+  { institute: 1, class: 1, subject: 1, date: 1, type: 1 },
   { unique: true, partialFilterExpression: { type: "student" } }
 );
 

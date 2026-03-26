@@ -7,6 +7,7 @@ import {
   checkExamEligibility,
   attendanceAnalytics,
   attendanceSummary,
+  getStudentsForAttendance,
 } from "../controllers/attendance.controller.js";
 import auth from "../middlewares/auth.js";
 import {
@@ -22,7 +23,10 @@ import {
 
 const router = express.Router();
 
-router.post("/mark-attendance", auth, markAttendance);
+// Step 1: fetch students for a class+subject before marking attendance
+router.get("/students", auth, getStudentsForAttendance);
+
+router.post("/mark-attendance", auth, markAttendanceRules, validate, markAttendance);
 router.get("/get-attendance", auth, getMyAttendance);
 router.get("/get-student-attendance/:studentId", auth, attendanceSummary);
 router.get(
