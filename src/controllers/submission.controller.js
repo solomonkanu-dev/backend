@@ -64,7 +64,8 @@ export const gradeSubmission = async (req, res) => {
     }
 
     // Scope check — must belong to same institute
-    if (String(submission.assignment.institute) !== String(req.user.institute)) {
+    const instituteId = req.user.institute?._id || req.user.institute;
+    if (String(submission.assignment.institute) !== String(instituteId)) {
       return res.status(403).json({ message: "Access denied" });
     }
 

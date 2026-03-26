@@ -27,7 +27,7 @@ export const createAssignment = async (req, res) => {
       institute: req.user.institute,
       dueDate,
       totalMarks: totalMarks ?? 100,
-      status: status ?? "draft",
+      status: status ?? "published",
     });
 
     res.status(201).json({ message: "Assignment created successfully", assignment });

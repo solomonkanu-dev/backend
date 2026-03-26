@@ -21,6 +21,16 @@ export async function migrateIndexes() {
         logger.warn('Could not drop stale attendance index:', err.message);
       }
     }
+
+    // Backfill assignments that were created before the status field was added.
+    // They have status undefined/null — set them all to "published" so they remain visible.
+    const assignmentResult = await db.collection('assignments').updateMany(
+      { $or: [{ status: { $exists: false } }, { status: null }] },
+      { $set: { status: 'published' } }
+    );
+    if (assignmentResult.modifiedCount > 0) {
+      logger.info(`Backfilled status=published on ${assignmentResult.modifiedCount} assignment(s)`);
+    }
   } catch (err) {
     logger.warn('migrateIndexes failed (non-fatal):', err.message);
   }
