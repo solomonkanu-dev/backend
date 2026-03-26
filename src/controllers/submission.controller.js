@@ -9,13 +9,10 @@ export const submitAssignment = async (req, res) => {
 
     const { assignmentId, fileUrl } = req.body;
 
-    if (!assignmentId || !fileUrl) {
-      return res.status(400).json({ message: "Assignment and file required" });
-    }
-
     const assignment = await Assignment.findOne({
       _id: assignmentId,
       institute: req.user.institute,
+      status: "published",
     });
 
     if (!assignment) {
@@ -24,21 +21,25 @@ export const submitAssignment = async (req, res) => {
 
     const exists = await Submission.findOne({
       assignment: assignmentId,
-      student: req.user.id,
+      student: req.user._id,
     });
 
     if (exists) {
       return res.status(409).json({ message: "Already submitted" });
     }
 
+    const isLate = new Date() > new Date(assignment.dueDate);
+
     const submission = await Submission.create({
       assignment: assignmentId,
-      student: req.user.id,
-      fileUrl,
+      student: req.user._id,
+      fileUrl: fileUrl || "",
+      isLate,
+      status: "pending",
     });
 
     res.status(201).json({
-      message: "Assignment submitted successfully",
+      message: isLate ? "Assignment submitted (late)" : "Assignment submitted successfully",
       submission,
     });
   } catch (error) {
@@ -49,25 +50,42 @@ export const submitAssignment = async (req, res) => {
 
 export const gradeSubmission = async (req, res) => {
   try {
-    if (req.user.role !== "lecturer") {
-      return res.status(403).json({ message: "Only lecturers can grade" });
+    if (req.user.role !== "lecturer" && req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
     }
 
     const { submissionId } = req.params;
-    const { score } = req.body;
+    const { score, feedback } = req.body;
 
-    const submission = await Submission.findById(submissionId)
-      .populate("assignment");
+    const submission = await Submission.findById(submissionId).populate("assignment");
 
     if (!submission) {
       return res.status(404).json({ message: "Submission not found" });
     }
 
-    if (submission.assignment.lecturer.toString() !== req.user.id) {
-      return res.status(403).json({ message: "Unauthorized" });
+    // Scope check — must belong to same institute
+    if (String(submission.assignment.institute) !== String(req.user.institute)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Lecturers can only grade their own assignments
+    if (
+      req.user.role === "lecturer" &&
+      String(submission.assignment.lecturer) !== String(req.user._id)
+    ) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Score must not exceed totalMarks
+    if (score > submission.assignment.totalMarks) {
+      return res.status(400).json({
+        message: `Score cannot exceed total marks (${submission.assignment.totalMarks})`,
+      });
     }
 
     submission.score = score;
+    submission.feedback = feedback ?? submission.feedback;
+    submission.status = "graded";
     await submission.save();
 
     res.json({ message: "Submission graded", submission });
@@ -76,18 +94,61 @@ export const gradeSubmission = async (req, res) => {
   }
 };
 
+
 export const getSubmissionsForAssignment = async (req, res) => {
-  const { assignmentId } = req.params;
+  try {
+    if (req.user.role !== "lecturer" && req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
 
-  const submissions = await Submission.find({ assignment: assignmentId })
-    .populate("student", "fullName email");
+    const { assignmentId } = req.params;
 
-  res.json(submissions);
+    const assignment = await Assignment.findOne({
+      _id: assignmentId,
+      institute: req.user.institute,
+    });
+
+    if (!assignment) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+
+    // Lecturers can only see submissions for their own assignments
+    if (req.user.role === "lecturer" && String(assignment.lecturer) !== String(req.user._id)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const submissions = await Submission.find({ assignment: assignmentId })
+      .populate("student", "fullName email studentProfile")
+      .sort({ createdAt: 1 });
+
+    res.json({
+      total: submissions.length,
+      graded: submissions.filter((s) => s.status === "graded").length,
+      pending: submissions.filter((s) => s.status === "pending").length,
+      submissions,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
-export const getMySubmissions = async (req, res) => {
-  const submissions = await Submission.find({ student: req.user.id })
-    .populate("assignment", "title dueDate");
 
-  res.json(submissions);
+export const getMySubmissions = async (req, res) => {
+  try {
+    if (req.user.role !== "student") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const submissions = await Submission.find({ student: req.user._id })
+      .populate({
+        path: "assignment",
+        select: "title dueDate totalMarks status subject",
+        populate: { path: "subject", select: "name code" },
+      })
+      .sort({ createdAt: -1 });
+
+    res.json(submissions);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };

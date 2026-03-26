@@ -2,13 +2,13 @@ import { body, param, validationResult } from 'express-validator';
 
 export const submitAssignmentRules = [
   body('assignmentId').isMongoId().withMessage('Valid assignment ID is required'),
-  body('content').optional(),
+  body('fileUrl').optional().isURL().withMessage('fileUrl must be a valid URL'),
 ];
 
 export const gradeSubmissionRules = [
   param('submissionId').isMongoId().withMessage('Invalid submission ID'),
-  body('marks').optional().isNumeric().withMessage('marks must be a number'),
-  body('grade').optional(),
+  body('score').exists().withMessage('score is required').bail().isNumeric().withMessage('score must be a number'),
+  body('feedback').optional().isString(),
 ];
 
 export const validate = (req, res, next) => {
