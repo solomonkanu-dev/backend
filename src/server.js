@@ -4,6 +4,7 @@ import app from './app.js';
 import connectDB from './config/db.js';
 import logger from './utils/logger.js';
 import seedPlans from './config/seedPlans.js';
+import { migrateIndexes } from './config/migrateIndexes.js';
 
 const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET'];
 for (const key of requiredEnvVars) {
@@ -19,6 +20,8 @@ const PORT = process.env.PORT || 8080;
 (async () => {
   try {
     await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/myapp');
+
+    await migrateIndexes();
 
     try {
       await seedPlans();
