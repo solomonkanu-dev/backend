@@ -122,12 +122,7 @@ export const getSubmissionsForAssignment = async (req, res) => {
       .populate("student", "fullName email studentProfile")
       .sort({ createdAt: 1 });
 
-    res.json({
-      total: submissions.length,
-      graded: submissions.filter((s) => s.status === "graded").length,
-      pending: submissions.filter((s) => s.status === "pending").length,
-      submissions,
-    });
+    res.json(submissions);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
