@@ -7,7 +7,7 @@ export const submitAssignment = async (req, res) => {
       return res.status(403).json({ message: "Only students can submit assignments" });
     }
 
-    const { assignmentId, fileUrl } = req.body;
+    const { assignmentId, fileUrl, content } = req.body;
 
     const assignment = await Assignment.findOne({
       _id: assignmentId,
@@ -34,6 +34,7 @@ export const submitAssignment = async (req, res) => {
       assignment: assignmentId,
       student: req.user._id,
       fileUrl: fileUrl || "",
+      content: content || "",
       isLate,
       status: "pending",
     });
@@ -55,7 +56,9 @@ export const gradeSubmission = async (req, res) => {
     }
 
     const { submissionId } = req.params;
-    const { score, feedback } = req.body;
+    // Accept either 'score' or 'marks' from the frontend
+    const score = Number(req.body.score ?? req.body.marks);
+    const { feedback } = req.body;
 
     const submission = await Submission.findById(submissionId).populate("assignment");
 
@@ -64,8 +67,8 @@ export const gradeSubmission = async (req, res) => {
     }
 
     // Scope check — must belong to same institute
-    const instituteId = req.user.institute?._id || req.user.institute;
-    if (String(submission.assignment.institute) !== String(instituteId)) {
+    const instituteId = String(req.user.institute?._id || req.user.institute);
+    if (String(submission.assignment.institute) !== instituteId) {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -78,14 +81,15 @@ export const gradeSubmission = async (req, res) => {
     }
 
     // Score must not exceed totalMarks
-    if (score > submission.assignment.totalMarks) {
+    const totalMarks = submission.assignment.totalMarks ?? 100;
+    if (score > totalMarks) {
       return res.status(400).json({
-        message: `Score cannot exceed total marks (${submission.assignment.totalMarks})`,
+        message: `Score cannot exceed total marks (${totalMarks})`,
       });
     }
 
     submission.score = score;
-    submission.feedback = feedback ?? submission.feedback;
+    if (feedback !== undefined) submission.feedback = feedback;
     submission.status = "graded";
     await submission.save();
 
@@ -120,6 +124,7 @@ export const getSubmissionsForAssignment = async (req, res) => {
 
     const submissions = await Submission.find({ assignment: assignmentId })
       .populate("student", "fullName email studentProfile")
+      .populate("assignment", "title totalMarks dueDate subject")
       .sort({ createdAt: 1 });
 
     res.json(submissions);
