@@ -81,6 +81,7 @@ app.use('/api/v1/audit-logs', auditLogRoutes);
 app.use('/api/v1/announcements', announcementRoutes);
 app.use('/api/v1/plans', planRoutes);
 app.use('/api/v1/system', systemConfigRoutes);
+app.use('/api/v1/system-config', systemConfigRoutes);
 app.use('/api/v1/exports', exportRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 
