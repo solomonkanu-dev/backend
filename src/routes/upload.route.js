@@ -1,23 +1,23 @@
-import {Router} from "express";
-import { getProfilePhoto, uploadProfilePhoto } from "../controllers/upload.controller.js";
-import authMiddleware from "../middlewares/auth.js";
-import multer from "multer";
+import { Router } from "express";
+import {
+  uploadProfilePhoto,
+  getProfilePhoto,
+  uploadInstituteLogo,
+  uploadAssignmentFile,
+} from "../controllers/upload.controller.js";
+import auth from "../middlewares/auth.js";
+import { uploadImage, uploadDocument, handleMulterError } from "../middlewares/upload.js";
 
-const router = Router()
+const router = Router();
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
+// Profile photo — any authenticated user
+router.post("/profile-photo", auth, uploadImage, handleMulterError, uploadProfilePhoto);
+router.get("/profile-photo", auth, getProfilePhoto);
 
+// Institute logo — admin only
+router.post("/institute-logo", auth, uploadImage, handleMulterError, uploadInstituteLogo);
 
-router.post(
-  "/profile-photo",
-  authMiddleware,
-  upload.single("profilePhoto"),
-  uploadProfilePhoto
-);
-
-router.get("/profile-photo", authMiddleware, getProfilePhoto);
-
-
+// Assignment file — student only (returns URL to use when submitting assignment)
+router.post("/assignment-file", auth, uploadDocument, handleMulterError, uploadAssignmentFile);
 
 export default router;

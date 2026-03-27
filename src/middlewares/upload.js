@@ -1,44 +1,47 @@
-// middleware/upload.js
 import multer from "multer";
-import path from "path";
 
-// Configure multer to use memory storage
 const storage = multer.memoryStorage();
 
-// File filter to accept only images
-const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+const imageMimeTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+const documentMimeTypes = [
+  ...imageMimeTypes,
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
 
-const fileFilter = (req, file, cb) => {
-  const ext = path.extname(file.originalname).toLowerCase();
-  if (allowedMimeTypes.includes(file.mimetype) && allowedExtensions.includes(ext)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only image files are allowed'), false);
-  }
+const imageFilter = (req, file, cb) => {
+  if (imageMimeTypes.includes(file.mimetype)) return cb(null, true);
+  cb(new Error("Only image files are allowed (jpeg, png, gif, webp)"), false);
 };
 
-// Create multer upload instance
-export const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 6 * 1024 * 1024, // 5MB limit
-  },
-});
+const documentFilter = (req, file, cb) => {
+  if (documentMimeTypes.includes(file.mimetype)) return cb(null, true);
+  cb(new Error("Only images and documents (PDF, DOC, DOCX) are allowed"), false);
+};
 
-// Export middleware for single file upload
-export const uploadSingle = upload.single("blogPhoto");
+// For profile photos and logos — images only, 5 MB
+export const uploadImage = multer({
+  storage,
+  fileFilter: imageFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).single("file");
 
-// Error handling middleware for multer
+// For assignment submissions — images + documents, 10 MB
+export const uploadDocument = multer({
+  storage,
+  fileFilter: documentFilter,
+  limits: { fileSize: 10 * 1024 * 1024 },
+}).single("file");
+
+// Uniform multer error handler — use after the multer middleware
 export const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({ message: "File size too large. Max 5MB allowed." });
+      return res.status(400).json({ message: "File too large. Max 5 MB for images, 10 MB for documents." });
     }
     return res.status(400).json({ message: err.message });
-  } else if (err) {
-    return res.status(400).json({ message: err.message });
   }
+  if (err) return res.status(400).json({ message: err.message });
   next();
 };

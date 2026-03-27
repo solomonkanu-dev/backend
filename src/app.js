@@ -26,6 +26,7 @@ import planRoutes from './routes/plan.route.js';
 import systemConfigRoutes from './routes/systemConfig.route.js';
 import exportRoutes from './routes/export.route.js';
 import notificationRoutes from './routes/notification.route.js';
+import uploadRoutes from './routes/upload.route.js';
 import { maintenanceCheck } from './middlewares/maintenanceCheck.js';
 
 const app = express();
@@ -84,6 +85,7 @@ app.use('/api/v1/system', systemConfigRoutes);
 app.use('/api/v1/system-config', systemConfigRoutes);
 app.use('/api/v1/exports', exportRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/upload', uploadRoutes);
 
 // Error handler (last)
 app.use(errorHandler);
