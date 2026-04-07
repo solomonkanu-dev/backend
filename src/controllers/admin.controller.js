@@ -1,657 +1,389 @@
-import User from "../models/user.js";
-import Institute from "../models/Institute.js";
-import Class from "../models/Class.js";
-import Subject from "../models/Subject.js";
-import Assignment from "../models/Assignment.js";
-import Result from "../models/Result.js";
-import FeeParticular from "../models/Fees.js";
-import Attendance from "../models/Attendance.js";
-import bcrypt from "bcryptjs";
-import { randomBytes } from "crypto";
-import logger from "../utils/logger.js";
-import { logAudit } from "../utils/audit.js";
-import { notify, notifySuperAdmins } from "../utils/notify.js";
+import * as adminService from '../services/admin.service.js';
 
-const isDev = process.env.NODE_ENV === "development";
-
-export const requestAdminSignup = async (req, res) => {
+export const requestAdminSignup = async (req, res, next) => {
   try {
-    const { fullName, email, password } = req.body;
-
-    const exists = await User.findOne({ email });
-    if (exists)
-      return res.status(409).json({ message: "Email already in use" });
-
-    const newUser = await User.create({
-      fullName,
-      email,
-      password,
-      role: "admin",
-      approved: false,
-      institute: null,
-      onboarding: { status: 'pending', submittedAt: new Date() },
-    });
-
-    notifySuperAdmins({
-      type: 'new_admin_signup',
-      title: 'New Admin Signup Request',
-      message: `${fullName} (${email}) has requested admin access`,
-      relatedEntity: { entityType: 'User', entityId: newUser._id },
-    });
-
+    await adminService.requestAdminSignup(req.body);
     res.status(201).json({
-      message: "Admin signup request submitted. Awaiting approval.",
+      message: 'Admin signup request submitted. Awaiting approval.',
     });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const createStudent = async (req, res) => {
+export const createStudent = async (req, res, next) => {
   try {
-    // 1️⃣ Authorization
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Admin access only" });
-    }
-
-    if (!req.user.institute) {
-      return res.status(400).json({ message: "Institute required" });
-    }
-
-    const { fullName, email, classId, studentProfile } = req.body;
-
-    // 2️⃣ Validate class
-    const classDoc = await Class.findOne({
-      _id: classId,
-      institute: req.user.institute,
-    });
-
-    if (!classDoc) {
-      return res.status(404).json({ message: "Class not found" });
-    }
-
-    // 3️⃣ Prevent duplicate email
-    const exists = await User.findOne({ email });
-    if (exists) {
-      return res.status(409).json({ message: "Student already exists" });
-    }
-
-    // 4️⃣ Create temp password
-    const tempPassword = randomBytes(12).toString("base64url");
-
-    // 5️⃣ Create student
-    const student = await User.create({
-      fullName,
-      email,
-      password: tempPassword,
-      role: "student",
-      institute: req.user.institute,
-      class: classId,
-      approved: true,
-      studentProfile,
-    });
-
-    // 6️⃣ 🔥 IMPORTANT: push student into class
-    await Class.findByIdAndUpdate(classId, {
-      $addToSet: { students: student._id }, // prevents duplicates
-    });
-
-    logAudit(req, { action: "CREATE_STUDENT", entity: "User", entityId: student._id, description: `Created student ${fullName} (${email})`, statusCode: 201 });
-
-    const instituteId = req.user.institute?._id || req.user.institute;
-    notify({
-      recipientId: req.user._id,
-      instituteId,
-      type: 'new_student_enrolled',
-      title: 'New Student Enrolled',
-      message: `${fullName} has been enrolled`,
-      relatedEntity: { entityType: 'User', entityId: student._id },
-    });
-
+    const result = await adminService.createStudent(req.body, req);
     res.status(201).json({
       statusCode: 201,
-      message: "Student created successfully",
-      student,
-      tempPassword,
+      message: 'Student created successfully',
+      student: result.student,
+      tempPassword: result.tempPassword,
     });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const createLecturer = async (req, res) => {
+export const createLecturer = async (req, res, next) => {
   try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Admin access only" });
-    }
+    const user = await adminService.createLecturer(req.body, req);
+    res.status(201).json({ statusCode: 201, message: 'Employee created successfully', user });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    if (!req.user.institute) {
-      return res.status(400).json({ message: "Institute required" });
-    }
+export const updateLecturerProfile = async (req, res, next) => {
+  try {
+    const user = await adminService.updateLecturerProfile(req.params.id, req.body);
+    res.json({ message: 'Lecturer profile updated successfully', user });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    const { fullName, email, lecturerProfile } = req.body;
+export const resetPassword = async (req, res, next) => {
+  try {
+    await adminService.resetPassword(req.params.userId, req.body.password, req);
+    res.json({ message: 'Password reset successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    if (!lecturerProfile) {
-      return res.status(400).json({
-        message: "Lecturer profile data is required",
-      });
-    }
+export const createInstitute = async (req, res, next) => {
+  try {
+    const institute = await adminService.createInstitute(req.body, req.user);
+    res.status(201).json({ message: 'Institute created successfully', institute });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    const user = await User.create({
-      fullName,
-      email,
-      password: randomBytes(12).toString("base64url"),
-      role: "lecturer",
-      institute: req.user.institute,
-      approved: true,
-      lecturerProfile,
-    });
+export const getAllStudents = async (req, res, next) => {
+  try {
+    const result = await adminService.getAllStudents(req.query, req.user);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
 
-    logAudit(req, { action: "CREATE_LECTURER", entity: "User", entityId: user._id, description: `Created lecturer ${fullName} (${email})`, statusCode: 201 });
+export const getAllLecturers = async (req, res, next) => {
+  try {
+    const result = await adminService.getAllLecturers(req.query, req.user);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
 
+export const getLecturerById = async (req, res, next) => {
+  try {
+    const data = await adminService.getLecturerById(req.params.lecturerId, req.user);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getStudentById = async (req, res, next) => {
+  try {
+    const data = await adminService.getStudentById(req.params.studentId);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getStudentAssignments = async (req, res, next) => {
+  try {
+    const data = await adminService.getStudentAssignments(req.params.studentId, req.user);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getClassById = async (req, res, next) => {
+  try {
+    const result = await adminService.getClassById(req.params.classId, req.user);
+    res.status(200).json({ statusCode: 200, ...result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getClassWithStudents = async (req, res, next) => {
+  try {
+    const data = await adminService.getClassWithStudents(req.params.classId);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getAllClasses = async (req, res, next) => {
+  try {
+    const result = await adminService.getAllClasses(req.query, req.user);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getStudentsByClass = async (req, res, next) => {
+  try {
+    const data = await adminService.getStudentsByClass();
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getLecturerClasses = async (req, res, next) => {
+  try {
+    const data = await adminService.getLecturerClasses(req.params.lecturerId);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getStudentClasses = async (req, res, next) => {
+  try {
+    const result = await adminService.getStudentClasses(req.params.studentId);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getAllAssignments = async (req, res, next) => {
+  try {
+    const data = await adminService.getAllAssignments();
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getResultsByClass = async (req, res, next) => {
+  try {
+    const data = await adminService.getResultsByClass(req.params.classId, req.user);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getResultsBySubject = async (req, res, next) => {
+  try {
+    const data = await adminService.getResultsBySubject(req.params.subjectId, req.user);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getMyInstitute = async (req, res, next) => {
+  try {
+    const data = await adminService.getMyInstitute(req.user.id || req.user._id);
+    res.status(200).json({ statusCode: 200, success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateInstitute = async (req, res, next) => {
+  try {
+    const data = await adminService.updateInstitute(req.user.id || req.user._id, req.body);
+    res.status(200).json({ message: 'Institute updated successfully', data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const createFeeParticular = async (req, res, next) => {
+  try {
+    const result = await adminService.createFeeParticular(req.body, req.user);
     res.status(201).json({
-      statusCode: 201,
-      message: "Employee created successfully",
-      user,
+      message: 'Fee particulars created successfully',
+      count: result.count,
+      fees: result.fees,
     });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const updateLecturerProfile = async (req, res) => {
+export const markAttendance = async (req, res, next) => {
   try {
-    const lecturerId = req.params.id;
-
-    const user = await User.findById(lecturerId);
-
-    if (!user || user.role !== "lecturer") {
-      return res.status(404).json({ message: "Lecturer not found" });
-    }
-
-    user.lecturerProfile = req.body;
-    await user.save();
-
-    res.json({
-      message: "Lecturer profile updated successfully",
-      user,
-    });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+    const attendance = await adminService.markAttendance(req.body, req.user);
+    res.json({ message: 'Attendance saved', attendance });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const resetPassword = async (req, res) => {
+export const attendanceSummary = async (req, res, next) => {
   try {
-    const { userId } = req.params;
-    const { password } = req.body;
-
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    await User.findByIdAndUpdate(userId, {
-      password: hashedPassword,
-    });
-
-    logAudit(req, { action: "RESET_PASSWORD", entity: "User", entityId: userId, description: `Reset password for user ${userId}`, statusCode: 200 });
-
-    res.json({ message: "Password reset successfully" });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+    const result = await adminService.attendanceSummary(req.params.studentId);
+    res.json(result);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const createInstitute = async (req, res) => {
+export const suspendUser = async (req, res, next) => {
   try {
-    const {
-      name,
-      address,
-      phoneNumber,
-      website,
-      country,
-      email,
-      targetLine,
-      logo,
-    } = req.body;
-
-    // Check if admin already has an institute
-    const existingInstitute = await Institute.findOne({
-      admin: req.user.id,
-    });
-
-    if (existingInstitute) {
-      return res.status(400).json({
-        message: " Admin already created an Institute ",
-      });
-    }
-
-    const institute = await Institute.create({
-      name,
-      address,
-      website,
-      country,
-      email,
-      phoneNumber,
-      targetLine,
-      logo,
-      admin: req.user.id,
-    });
-
-    // Attach institute to admin
-    await User.findByIdAndUpdate(req.user.id, {
-      institute: institute._id,
-    });
-
-    notifySuperAdmins({
-      type: 'institute_created',
-      title: 'New Institute Created',
-      message: `Institute "${name}" has been created`,
-      relatedEntity: { entityType: 'Institute', entityId: institute._id },
-    });
-
-    res.status(201).json({
-      message: "Institute created successfully",
-      institute,
-    });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+    await adminService.suspendUser(req.params.userId, req);
+    res.json({ success: true, message: 'Account suspended successfully' });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const getAllStudents = async (req, res) => {
+export const unsuspendUser = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const skip = (page - 1) * limit;
-    const filter = { role: "student", institute: req.user.institute };
-    const [data, total] = await Promise.all([
-      User.find(filter).skip(skip).limit(limit).populate("class", "name"),
-      User.countDocuments(filter),
-    ]);
-    res.json({ data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+    await adminService.unsuspendUser(req.params.userId, req);
+    res.json({ success: true, message: 'Account unsuspended successfully' });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const getAllLecturers = async (req, res) => {
+export const deleteUser = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const skip = (page - 1) * limit;
-    const filter = { role: "lecturer", institute: req.user.institute };
-    const [data, total] = await Promise.all([
-      User.find(filter).skip(skip).limit(limit),
-      User.countDocuments(filter),
-    ]);
-    res.json({ data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+    await adminService.deleteUser(req.params.userId, req);
+    res.json({ success: true, message: 'Account deleted successfully' });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const getLecturerById = async (req, res) => {
-  const lecturer = await User.findById(req.params.lecturerId).select(
-    "fullName email lecturerProfile"
-  );
-  res.json(lecturer);
-};
-
-export const getStudentById = async (req, res) => {
-  const student = await User.findById(req.params.studentId).select(
-    "fullName studentProfile"
-  );
-  res.json(student);
-};
-
-export const getClassById = async (req, res) => {
+export const updateStudentLifecycle = async (req, res, next) => {
   try {
-    const { classId } = req.params;
-
-    if (!["admin", "lecturer"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    const instituteId = req.user.institute?._id || req.user.institute;
-
-    const classDoc = await Class.findOne({
-      _id: classId,
-      institute: instituteId,
-    })
-      .populate("lecturer", "fullName email role phoneNumber")
-      .populate("students", "fullName email role class studentProfile");
-
-    if (!classDoc) {
-      return res.status(404).json({ message: "Class not found" });
-    }
-
-    const totalStudents = classDoc.students.length;
-    const totalMales = classDoc.students.filter(
-      (student) => student?.studentProfile.gender === "male"
-    ).length;
-    const totalFemales = classDoc.students.filter(
-      (student) => student?.studentProfile.gender === "female"
-    ).length;
-
-    res.status(200).json({
-      statusCode: 200,
-      class: classDoc,
-      totalStudents,
-      totalMales,
-      totalFemales,
-    });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
-  }
-};
-
-export const getClassWithStudents = async (req, res) => {
-  const classData = await Class.findById(req.params.classId).populate(
-    "students",
-    "fullName email"
-  );
-
-  res.json(classData);
-};
-
-export const getAllClasses = async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
-    const skip = (page - 1) * limit;
-    const filter = { institute: req.user.institute };
-    const [classes, total] = await Promise.all([
-      Class.find(filter)
-        .skip(skip)
-        .limit(limit)
-        .populate("lecturer", "fullName email")
-        .populate("students", "fullName email studentProfile"),
-      Class.countDocuments(filter),
-    ]);
-
-    // Add gender statistics
-    const data = classes.map((cls) => {
-      const classObj = cls.toObject();
-      const totalMale = classObj.students.filter(
-        (student) => student.studentProfile?.gender && student.studentProfile.gender.toLowerCase() === 'male'
-      ).length;
-      const totalFemale = classObj.students.filter(
-        (student) => student.studentProfile?.gender && student.studentProfile.gender.toLowerCase() === 'female'
-      ).length;
-
-      return {
-        ...classObj,
-        totalMale,
-        totalFemale,
-        totalStudents: classObj.students.length,
-        students: classObj.students.map((s) => ({
-          _id: s._id,
-          fullName: s.fullName,
-          email: s.email,
-        })),
-      };
-    });
-
-    res.json({ data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
-  }
-};
-
-export const getStudentsByClass = async (req, res) => {
-  const students = await User.find({
-    role: "student",
-    // class: req.params.classId
-  }).populate("class", "name");
-
-  res.json(students);
-};
-
-export const getLecturerClasses = async (req, res) => {
-  const subjects = await Subject.find({
-    lecturer: req.params.lecturerId,
-  }).populate("class", "name");
-
-  res.json(subjects);
-};
-
-export const getStudentClasses = async (req, res) => {
-  const student = await User.findById(req.params.studentId).populate(
-    "class",
-    "name"
-  );
-
-  const subjects = await Subject.find({
-    class: student.class._id,
-  });
-
-  res.json({
-    class: student.class,
-    subjects,
-  });
-};
-
-export const getAllAssignments = async (req, res) => {
-  const assignments = await Assignment.find()
-    .populate("subject", "name")
-    .populate("createdBy", "name");
-
-  res.json(assignments);
-};
-
-export const getResultsBySubject = async (req, res) => {
-  const results = await Result.find({
-    subject: req.params.subjectId,
-  })
-    .populate("student", "name")
-    .populate("subject", "name");
-
-  res.json(results);
-};
-
-export const getMyInstitute = async (req, res) => {
-  try {
-    const institute = await Institute.findOne({ admin: req.user.id });
-
-    if (!institute) {
-      return res.status(404).json({
-        success: false,
-        message: "Institute not found",
-      });
-    }
-
-    res.status(200).json({
-      statusCode: 200,
-      success: true,
-      data: institute,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: isDev ? error.message : "Internal server error",
-    });
-  }
-};
-
-export const updateInstitute = async (req, res) => {
-  try {
-    const institute = await Institute.findOneAndUpdate(
-      { admin: req.user.id },
+    const student = await adminService.updateStudentLifecycle(
+      req.params.studentId,
       req.body,
-      { new: true }
+      req
     );
-
-    if (!institute) {
-      return res.status(404).json({ message: "Institute not found" });
-    }
-
-    res.status(200).json({
-      message: "Institute updated successfully",
-      data: institute,
-    });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+    res.json({ message: 'Student status updated', student });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const createFeeParticular = async (req, res) => {
+export const getClassRankings = async (req, res, next) => {
   try {
-    // Admin must have an institute
-    if (!req.user.institute) {
-      return res.status(400).json({
-        message: "Create institute before adding fees",
-      });
-    }
-
-    const { fees } = req.body;
-
-    // Validate input
-    if (!Array.isArray(fees) || fees.length === 0) {
-      return res.status(400).json({
-        message: "Fees must be a non-empty array",
-      });
-    }
-
-    const titles = fees.map((f) => f.title);
-    const hasDuplicates = new Set(titles).size !== titles.length;
-
-    if (hasDuplicates) {
-      return res.status(400).json({
-        message: "Duplicate fee titles in request",
-      });
-    }
-
-    // Prepare fee records
-    const feeDocs = fees.map((fee) => ({
-      title: fee.title,
-      amount: fee.amount,
-      institute: req.user.institute,
-      createdBy: req.user.id,
-    }));
-
-    const createdFees = await FeeParticular.insertMany(feeDocs);
-
-    res.status(201).json({
-      message: "Fee particulars created successfully",
-      count: createdFees.length,
-      fees: createdFees,
-    });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+    const result = await adminService.getClassRankings(req.params.classId, req.user);
+    res.json(result);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const markAttendance = async (req, res) => {
-  const { classId, date, records } = req.body;
-
-  const attendance = await Attendance.findOneAndUpdate(
-    { class: classId, date, institute: req.user.institute },
-    {
-      class: classId,
-      date,
-      institute: req.user.institute,
-      records,
-      markedBy: req.user.id,
-    },
-    { upsert: true, new: true }
-  );
-
-  res.json({ message: "Attendance saved", attendance });
-};
-
-export const attendanceSummary = async (req, res) => {
-  const { studentId } = req.params;
-
-  const total = await Attendance.countDocuments({
-    "records.student": studentId,
-  });
-
-  const present = await Attendance.countDocuments({
-    records: { $elemMatch: { student: studentId, status: "present" } },
-  });
-
-  const percentage = total === 0 ? 0 : ((present / total) * 100).toFixed(2);
-
-  res.json({ total, present, percentage });
-};
-
-export const suspendUser = async (req, res) => {
+export const getReportCard = async (req, res, next) => {
   try {
-    const { userId } = req.params;
-
-    const user = await User.findOne({
-      _id: userId,
-      role: { $in: ["student", "lecturer"] },
-      institute: req.user.institute,
-    });
-
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    if (!user.isActive) {
-      return res.status(400).json({ success: false, message: "Account is already suspended" });
-    }
-
-    user.isActive = false;
-    await user.save();
-
-    logAudit(req, { action: "SUSPEND_USER", entity: "User", entityId: user._id, description: `Suspended ${user.role} ${user.fullName} (${user.email})`, statusCode: 200 });
-
-    res.json({ success: true, message: `${user.role} account suspended successfully` });
-  } catch (error) {
-    res.status(500).json({ success: false, message: isDev ? error.message : "Internal server error" });
+    const data = await adminService.getReportCard(req.params.studentId, req.user);
+    res.json(data);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const unsuspendUser = async (req, res) => {
+export const updateStudent = async (req, res, next) => {
   try {
-    const { userId } = req.params;
-
-    const user = await User.findOne({
-      _id: userId,
-      role: { $in: ["student", "lecturer"] },
-      institute: req.user.institute,
-    });
-
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    if (user.isActive) {
-      return res.status(400).json({ success: false, message: "Account is already active" });
-    }
-
-    user.isActive = true;
-    await user.save();
-
-    logAudit(req, { action: "UNSUSPEND_USER", entity: "User", entityId: user._id, description: `Unsuspended ${user.role} ${user.fullName} (${user.email})`, statusCode: 200 });
-
-    res.json({ success: true, message: `${user.role} account unsuspended successfully` });
-  } catch (error) {
-    res.status(500).json({ success: false, message: isDev ? error.message : "Internal server error" });
+    const data = await adminService.updateStudent(req.params.studentId, req.body, req);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const deleteUser = async (req, res) => {
+export const getPromotionEligibility = async (req, res, next) => {
   try {
-    const { userId } = req.params;
+    const data = await adminService.getPromotionEligibility(
+      req.params.classId,
+      req.query,
+      req.user
+    );
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    const user = await User.findOne({
-      _id: userId,
-      role: { $in: ["student", "lecturer"] },
-      institute: req.user.institute,
-    });
+export const bulkPromoteStudents = async (req, res, next) => {
+  try {
+    const result = await adminService.bulkPromoteStudents(req.body, req);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
+export const updateLecturer = async (req, res, next) => {
+  try {
+    const data = await adminService.updateLecturer(req.params.lecturerId, req.body, req);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    await user.deleteOne();
+export const createParent = async (req, res, next) => {
+  try {
+    const data = await adminService.createParent(req.body, req.user);
+    res.status(201).json({ message: 'Parent account created', data });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    logAudit(req, { action: "DELETE_USER", entity: "User", entityId: user._id, description: `Deleted ${user.role} ${user.fullName} (${user.email})`, statusCode: 200 });
+export const getParents = async (req, res, next) => {
+  try {
+    const data = await adminService.getParents(req.user);
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    res.json({ success: true, message: `${user.role} account deleted successfully` });
-  } catch (error) {
-    res.status(500).json({ success: false, message: isDev ? error.message : "Internal server error" });
+export const linkStudentToParent = async (req, res, next) => {
+  try {
+    const data = await adminService.linkStudentToParent(req.body, req.user);
+    res.json({ message: 'Student linked to parent', data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const unlinkStudentFromParent = async (req, res, next) => {
+  try {
+    const data = await adminService.unlinkStudentFromParent(req.body, req.user);
+    res.json({ message: 'Student unlinked', data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const revokeParentAccess = async (req, res, next) => {
+  try {
+    await adminService.revokeParentAccess(req.params.parentId, req.user);
+    res.json({ message: 'Parent access revoked' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const restoreParentAccess = async (req, res, next) => {
+  try {
+    await adminService.restoreParentAccess(req.params.parentId, req.user);
+    res.json({ message: 'Parent access restored' });
+  } catch (err) {
+    next(err);
   }
 };

@@ -1,0 +1,105 @@
+import * as repo from '../repositories/parent.repository.js';
+import { AppError } from '../errors/AppError.js';
+
+export const getMyChildren = (linkedStudentIds) => repo.findLinkedStudents(linkedStudentIds);
+
+export const getChildAttendance = async (studentId, classId, user) => {
+  const linkedIds = user.linkedStudents.map(String);
+  if (!linkedIds.includes(String(studentId))) {
+    throw new AppError("Access denied to this student's data", 403);
+  }
+
+  let resolvedClassId = classId;
+  if (!resolvedClassId) {
+    const student = await repo.findStudentById(studentId);
+    resolvedClassId = student?.class;
+  }
+
+  const instituteId = user.institute?._id || user.institute;
+  const attendanceRecords = await repo.findAttendanceForStudent({
+    institute: instituteId,
+    ...(resolvedClassId ? { class: resolvedClassId } : {}),
+    'records.student': studentId,
+  });
+
+  let total = 0, present = 0, absent = 0;
+  const recentRecords = [];
+
+  for (const record of attendanceRecords) {
+    const entry = record.records.find((r) => String(r.student) === String(studentId));
+    if (entry) {
+      total += 1;
+      if (entry.status === 'present') present += 1;
+      else absent += 1;
+      if (recentRecords.length < 10) recentRecords.push({ date: record.date, status: entry.status });
+    }
+  }
+
+  const rate = total === 0 ? 0 : Math.round((present / total) * 100);
+  return { total, present, absent, rate, recentRecords, classId: resolvedClassId ?? null };
+};
+
+export const getChildResults = async (studentId, classId, user) => {
+  const linkedIds = user.linkedStudents.map(String);
+  if (!linkedIds.includes(String(studentId))) {
+    throw new AppError("Access denied to this student's data", 403);
+  }
+
+  let resolvedClassId = classId;
+  if (!resolvedClassId) {
+    const student = await repo.findStudentById(studentId);
+    resolvedClassId = student?.class;
+  }
+
+  const filter = { student: studentId };
+  if (resolvedClassId) filter.class = resolvedClassId;
+
+  const results = await repo.findResultsForStudent(filter);
+  return { data: results, classId: resolvedClassId ?? null };
+};
+
+export const getChildPromotionHistory = async (studentId, user) => {
+  const linkedIds = user.linkedStudents.map(String);
+  if (!linkedIds.includes(String(studentId))) {
+    throw new AppError("Access denied to this student's data", 403);
+  }
+
+  const student = await repo.findStudentWithPromotion(studentId);
+  if (!student) throw new AppError('Student not found', 404);
+
+  const history = (student.promotionHistory ?? [])
+    .slice()
+    .reverse()
+    .map((p) => ({ fromClass: p.fromClass, toClass: p.toClass, promotedAt: p.promotedAt }));
+
+  return { currentClass: student.class, history };
+};
+
+export const getChildFees = async (studentId, user) => {
+  const linkedIds = user.linkedStudents.map(String);
+  if (!linkedIds.includes(String(studentId))) {
+    throw new AppError("Access denied to this student's data", 403);
+  }
+
+  const instituteId = user.institute?._id || user.institute;
+  const student = await repo.findStudentById(studentId);
+  const feeFilter = { student: studentId, institute: instituteId };
+  if (student?.class) feeFilter.class = student.class;
+
+  const fees = await repo.findStudentFees(feeFilter);
+  return fees.map((sf) => ({
+    _id: sf._id,
+    totalAmount: sf.totalAmount ?? 0,
+    amountPaid: (sf.totalAmount ?? 0) - (sf.balance ?? 0),
+    balance: sf.balance ?? 0,
+    status: sf.status,
+    dueDate: sf.dueDate,
+    items: (sf.fees ?? []).map((item) => ({
+      title: item.fee?.title ?? 'Fee',
+      amount: item.amount ?? 0,
+      paid: item.paid ?? 0,
+    })),
+  }));
+};
+
+export const getAnnouncements = (instituteId) => repo.findAnnouncements(instituteId);

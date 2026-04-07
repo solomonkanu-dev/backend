@@ -21,6 +21,7 @@ router.post("/create-class", auth, adminOnly, enforcePlanLimits('classes'), crea
 
 router.get("/", auth, adminOnly, getClasses);
 router.get("/admin", auth, adminOnly, getInstituteClasses);
+router.get("/institute", auth, getInstituteClasses); // accessible by all authenticated roles
 router.get("/lecturer", auth, getLecturerClasses);
 router.get("/student", auth, getStudentClasses);
 

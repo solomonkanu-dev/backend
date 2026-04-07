@@ -1,42 +1,54 @@
-import User from '../models/user.js';
+import * as lecturerService from '../services/lecturer.service.js';
 
-// Placeholder for lecturer controller
 export const getLecturerDashboard = (req, res) => {
   res.json({ message: 'Lecturer dashboard not yet implemented' });
 };
 
-export const getLecturers = async (req, res) => {
+export const getLecturers = async (req, res, next) => {
   try {
-    const lecturers = await User.find({ role: 'lecturer' }).populate(
-      'institute',
-      'name'
-    );
-    res.json(lecturers);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    const data = await lecturerService.getLecturers(req.user);
+    res.json(data);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const getLecturerById = async (req, res) => {
+export const getLecturerById = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const data = await lecturerService.getLecturerById(req.params.id, req.user);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
 
-    if (!id) {
-      return res.status(400).json({ message: 'Lecturer ID is required' });
-    }
+export const getMyClasses = async (req, res, next) => {
+  try {
+    const data = await lecturerService.getMyClasses(req.user);
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    const lecturer = await User.findOne({
-      _id: id,
-      role: 'lecturer',
-      institute: req.user.institute,
-    }).populate('institute', 'name');
+export const getLecturerPromotionEligibility = async (req, res, next) => {
+  try {
+    const data = await lecturerService.getLecturerPromotionEligibility(
+      req.params.classId,
+      req.query,
+      req.user
+    );
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+};
 
-    if (!lecturer) {
-      return res.status(404).json({ message: 'Lecturer not found' });
-    }
-
-    res.json(lecturer);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+export const lecturerBulkPromote = async (req, res, next) => {
+  try {
+    const result = await lecturerService.lecturerBulkPromote(req.body, req);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    next(err);
   }
 };

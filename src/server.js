@@ -5,6 +5,9 @@ import connectDB from './config/db.js';
 import logger from './utils/logger.js';
 import seedPlans from './config/seedPlans.js';
 import { migrateIndexes } from './config/migrateIndexes.js';
+import { startAutoFinalizeJob } from './jobs/autoFinalizeAttendance.js';
+import { backfillQRTokens } from './services/qrAttendance.service.js';
+import { initSocket } from './socket.js';
 
 const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET'];
 for (const key of requiredEnvVars) {
@@ -29,7 +32,12 @@ const PORT = process.env.PORT || 8080;
       console.warn('Failed to seed plans:', err.message);
     }
 
+    // Start background jobs and one-time migrations (DB is now connected)
+    startAutoFinalizeJob();
+    backfillQRTokens();
+
     const server = createServer(app);
+    initSocket(server);
 
     server.listen(PORT, () => {
       logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'}`);

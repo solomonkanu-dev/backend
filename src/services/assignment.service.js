@@ -1,0 +1,147 @@
+import { AppError } from '../errors/AppError.js';
+import * as assignmentRepo from '../repositories/assignment.repository.js';
+import { sendEmailNotification } from '../utils/email.js';
+
+// ─── Private: fire-and-forget email to students ───────────────────────────────
+
+async function notifyAssignmentByEmail(assignment, requestingUser) {
+  try {
+    const { default: Institute } = await import('../models/Institute.js');
+
+    const instituteId = requestingUser.institute?._id || requestingUser.institute;
+    if (!instituteId) return;
+
+    const institute = await Institute.findById(instituteId).select('name').lean();
+    const instituteName = institute?.name ?? 'Institution';
+
+    const subject = await assignmentRepo.findSubjectById(assignment.subject);
+    const subjectName = subject?.name ?? 'Unknown Subject';
+
+    const dueDateStr = assignment.dueDate
+      ? new Date(assignment.dueDate).toLocaleDateString('en-US', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        })
+      : 'No due date';
+
+    const students = await assignmentRepo.findStudentsByClass(assignment.class, instituteId);
+
+    await Promise.allSettled(
+      students.map((s) =>
+        sendEmailNotification({
+          instituteId,
+          type: 'assignmentPosted',
+          recipientId: s._id,
+          recipientEmail: s.email,
+          instituteName,
+          data: {
+            title: assignment.title,
+            subject: subjectName,
+            dueDate: dueDateStr,
+            totalMarks: assignment.totalMarks ?? 100,
+          },
+        })
+      )
+    );
+  } catch {
+    // fire-and-forget — never throws
+  }
+}
+
+// ─── Exports ──────────────────────────────────────────────────────────────────
+
+export const createAssignment = async (body, user) => {
+  if (!['lecturer', 'admin'].includes(user.role)) {
+    throw new AppError('Access denied', 403);
+  }
+
+  const { title, description, subjectId, dueDate, totalMarks, status } = body;
+
+  const subjectQuery = { _id: subjectId, institute: user.institute };
+  if (user.role === 'lecturer') subjectQuery.lecturer = user._id;
+
+  const { default: Subject } = await import('../models/Subject.js');
+  const subject = await Subject.findOne(subjectQuery);
+  if (!subject) throw new AppError('Subject not found or unauthorized', 404);
+
+  const assignment = await assignmentRepo.create({
+    title,
+    description,
+    subject: subjectId,
+    class: subject.class,
+    lecturer: user._id,
+    institute: user.institute,
+    dueDate,
+    totalMarks: totalMarks ?? 100,
+    status: status ?? 'published',
+  });
+
+  // Fire-and-forget
+  notifyAssignmentByEmail(assignment, user).catch(() => {});
+
+  return assignment;
+};
+
+export const getAssignmentsBySubject = async (subjectId, user) => {
+  const extra = user.role === 'student' ? { status: 'published' } : {};
+  return assignmentRepo.findBySubject(subjectId, user.institute, extra);
+};
+
+export const getAssignmentsByClass = async (classId, user) => {
+  const extra = user.role === 'student' ? { status: 'published' } : {};
+  return assignmentRepo.findByClass(classId, user.institute, extra);
+};
+
+export const getMyAssignments = async (user) => {
+  if (user.role !== 'lecturer') throw new AppError('Access denied', 403);
+  return assignmentRepo.findByLecturer(user._id, user.institute);
+};
+
+export const getAssignmentById = async (id, user) => {
+  const assignment = await assignmentRepo.findOne({ _id: id, institute: user.institute });
+  if (!assignment) throw new AppError('Assignment not found', 404);
+
+  if (user.role === 'student' && assignment.status !== 'published') {
+    throw new AppError('Assignment not found', 404);
+  }
+
+  return assignment;
+};
+
+export const updateAssignment = async (id, body, user) => {
+  if (!['lecturer', 'admin'].includes(user.role)) {
+    throw new AppError('Access denied', 403);
+  }
+
+  const assignment = await assignmentRepo.findOne({ _id: id, institute: user.institute });
+  if (!assignment) throw new AppError('Assignment not found', 404);
+
+  if (user.role === 'lecturer' && String(assignment.lecturer) !== String(user._id)) {
+    throw new AppError('Access denied', 403);
+  }
+
+  const { title, description, dueDate, totalMarks, status } = body;
+  if (title !== undefined) assignment.title = title;
+  if (description !== undefined) assignment.description = description;
+  if (dueDate !== undefined) assignment.dueDate = dueDate;
+  if (totalMarks !== undefined) assignment.totalMarks = totalMarks;
+  if (status !== undefined) assignment.status = status;
+
+  return assignmentRepo.save(assignment);
+};
+
+export const deleteAssignment = async (id, user) => {
+  if (!['lecturer', 'admin'].includes(user.role)) {
+    throw new AppError('Access denied', 403);
+  }
+
+  const assignment = await assignmentRepo.findOne({ _id: id, institute: user.institute });
+  if (!assignment) throw new AppError('Assignment not found', 404);
+
+  if (user.role === 'lecturer' && String(assignment.lecturer) !== String(user._id)) {
+    throw new AppError('Access denied', 403);
+  }
+
+  return assignmentRepo.deleteOne(assignment);
+};

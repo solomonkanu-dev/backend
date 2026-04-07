@@ -17,6 +17,7 @@ const notificationSchema = new mongoose.Schema(
         'maintenance_toggled',
         'admin_approved',
         'admin_rejected',
+        'promotion',
       ],
       required: true,
     },

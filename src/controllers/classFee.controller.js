@@ -1,32 +1,10 @@
-// controllers/classFee.controller.js
-import ClassFee from "../models/ClassFee.js";
+import * as classFeeService from '../services/classFee.service.js';
 
-export const assignFeesToClass = async (req, res) => {
+export const assignFeesToClass = async (req, res, next) => {
   try {
-    const { classId, fees } = req.body;
-
-    if (!req.user.institute) {
-      return res.status(403).json({
-        message: "Admin must belong to an institute",
-      });
-    }
-
-    const classFee = await ClassFee.findOneAndUpdate(
-      { class: classId, institute: req.user.institute },
-      {
-        class: classId,
-        institute: req.user.institute,
-        fees,
-        createdBy: req.user.id,
-      },
-      { upsert: true, new: true }
-    );
-
-    res.status(201).json({
-      message: "Fees assigned to class successfully",
-      classFee,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    const result = await classFeeService.assignFeesToClass(req.body, req.user);
+    res.status(200).json({ message: 'Fees assigned to class successfully', count: result.count });
+  } catch (err) {
+    next(err);
   }
 };

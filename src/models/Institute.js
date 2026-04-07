@@ -66,6 +66,17 @@ const instituteSchema = new Schema(
       assignedAt: { type: Date },
       assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     },
+
+    schoolType: {
+      type: String,
+      enum: ['primary', 'secondary'],
+      default: 'secondary',
+    },
+
+    onboardingCompleted: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

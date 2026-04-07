@@ -8,11 +8,12 @@ import {
   attendanceAnalytics,
   attendanceSummary,
   getStudentsForAttendance,
+  getClassWiseReport,
 } from "../controllers/attendance.controller.js";
 import auth from "../middlewares/auth.js";
 import {
   markAttendanceRules,
-  subjectIdParam,
+  classIdParam,
   validate,
 } from "../validators/attendance.validator.js";
 import {
@@ -20,6 +21,11 @@ import {
   getEmployeeAttendance,
   getEmployeeAttendanceSummary,
 } from "../controllers/employee.attendance.controller.js";
+import {
+  scanQR,
+  finalizeQRAttendance,
+  getQRSession,
+} from "../controllers/qr.attendance.controller.js";
 
 const router = express.Router();
 
@@ -30,25 +36,26 @@ router.post("/mark-attendance", auth, markAttendanceRules, validate, markAttenda
 router.get("/get-attendance", auth, getMyAttendance);
 router.get("/get-student-attendance/:studentId", auth, attendanceSummary);
 router.get(
-  "/eligibility/:subjectId",
+  "/eligibility/:classId",
   auth,
-  subjectIdParam,
+  classIdParam,
   validate,
   checkExamEligibility
 );
 router.get(
-  "/analytics/subject/:subjectId",
+  "/analytics/class/:classId",
   auth,
-  subjectIdParam,
+  classIdParam,
   validate,
   attendanceAnalytics
 );
 router.get("/subject", auth, getSubjectAttendance);
 router.get("/summary/me", auth, getMyAttendanceSummary);
+router.get("/report/class", auth, getClassWiseReport);
 router.get(
-  "/summary/subject/:subjectId",
+  "/summary/class/:classId",
   auth,
-  subjectIdParam,
+  classIdParam,
   validate,
   attendanceAnalytics
 );
@@ -57,5 +64,10 @@ router.get(
 router.post("/employee/mark-employee-attendance", auth, markEmployeeAttendance);
 router.get("/employee/get-employee-attendance", auth, getEmployeeAttendance);
 router.get("/employee/summary/:lecturerId", auth, getEmployeeAttendanceSummary);
+
+// QR attendance routes
+router.post("/qr/scan", auth, scanQR);
+router.post("/qr/finalize", auth, finalizeQRAttendance);
+router.get("/qr/session/:classId", auth, getQRSession);
 
 export default router;

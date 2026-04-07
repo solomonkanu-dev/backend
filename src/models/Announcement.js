@@ -7,7 +7,7 @@ const announcementSchema = new mongoose.Schema(
     type:  { type: String, enum: ['system_wide', 'institute_specific'], default: 'system_wide' },
     targetRoles: {
       type: [String],
-      enum: ['admin', 'lecturer', 'student', 'super_admin'],
+      enum: ['admin', 'lecturer', 'student', 'super_admin', 'parent'],
       default: ['admin', 'lecturer', 'student'],
     },
     institute: { type: mongoose.Schema.Types.ObjectId, ref: 'Institute', default: null },

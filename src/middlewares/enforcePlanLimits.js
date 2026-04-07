@@ -39,7 +39,7 @@ export const enforcePlanLimits = (resourceType) => async (req, res, next) => {
     if (count >= limit) {
       return res.status(403).json({
         success: false,
-        message: `Plan limit reached. Upgrade your plan to add more ${resourceType}.`,
+        message: `Plan limit reached. Contact service provider to Upgrade your plan to add more ${resourceType}.`,
         limit,
         current: count,
       });

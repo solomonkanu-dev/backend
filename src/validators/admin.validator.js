@@ -25,7 +25,6 @@ export const feesArrayRules = [
 
 export const assignFeeToStudentRules = [
   body('studentId').isMongoId().withMessage('Valid student ID required'),
-  body('feeParticularId').isMongoId().withMessage('Valid fee particular ID required'),
 ];
 
 export const resetPasswordRules = [

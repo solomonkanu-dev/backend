@@ -1,77 +1,14 @@
-// controllers/resultController.js
-import Result from "../models/Result.js";
-import Subject from "../models/Subject.js";
-import User from "../models/user.js";
-import { resolveGrade } from "./grading.controller.js";
-import { logAudit } from "../utils/audit.js";
+import * as resultService from '../services/result.service.js';
 
-const isDev = process.env.NODE_ENV === "development";
-
-export const assignMarks = async (req, res) => {
+export const assignMarks = async (req, res, next) => {
   try {
-    if (!["admin", "lecturer"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    const { studentId, subjectId, classId, marksObtained } = req.body;
-
-    const instituteId = req.user.institute?._id || req.user.institute;
-
-    const student = await User.findOne({
-      _id: studentId,
-      role: "student",
-      institute: instituteId,
-    });
-
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    const subject = await Subject.findOne({
-      _id: subjectId,
-      class: classId,
-      institute: instituteId,
-    });
-
-    if (!subject) {
-      return res.status(404).json({ message: "Subject not found" });
-    }
-
-    // Lecturers may only assign marks for subjects they own
-    if (req.user.role === "lecturer" && !subject.lecturer.equals(req.user._id)) {
-      return res.status(403).json({ message: "You are not assigned to this subject" });
-    }
-
-    if (marksObtained > subject.totalMarks) {
-      return res
-        .status(400)
-        .json({ message: "Marks exceed total marks" });
-    }
-
-    const grade = await resolveGrade(instituteId, marksObtained);
-
-    const result = await Result.findOneAndUpdate(
-      {
-        student: studentId,
-        subject: subjectId,
-        class: classId,
-      },
-      {
-        marksObtained,
-        grade,
-        institute: instituteId,
-      },
-      { upsert: true, new: true }
-    );
-
-    logAudit(req, { action: "ASSIGN_MARKS", entity: "Result", entityId: result._id, description: `Assigned ${marksObtained} marks (grade ${grade}) to student ${studentId} for subject ${subjectId}`, statusCode: 200 });
-
+    const result = await resultService.assignMarks(req.body, req);
     res.status(200).json({
       statusCode: 200,
-      message: "Marks assigned successfully",
+      message: 'Marks assigned successfully',
       result,
     });
-  } catch (error) {
-    res.status(500).json({ message: isDev ? error.message : "Internal server error" });
+  } catch (err) {
+    next(err);
   }
 };

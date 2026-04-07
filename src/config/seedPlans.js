@@ -11,13 +11,13 @@ const plans = [
     name: 'basic',
     displayName: 'Basic',
     limits: { maxStudents: 200, maxLecturers: 20, maxClasses: 15, maxStorageMB: 500 },
-    price: 29,
+    price: 3500,
   },
   {
     name: 'pro',
     displayName: 'Pro',
     limits: { maxStudents: 1000, maxLecturers: 100, maxClasses: 100, maxStorageMB: 5000 },
-    price: 99,
+    price: 6000,
   },
 ];
 

@@ -80,7 +80,7 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["admin", "lecturer", "student", "super_admin"],
+      enum: ["admin", "lecturer", "student", "super_admin", "parent"],
       required: true,
     },
 
@@ -111,6 +111,14 @@ const userSchema = new mongoose.Schema(
       default: true,
     },
 
+    lifecycleStatus: {
+      type: String,
+      enum: ["active", "graduated", "transferred", "withdrawn"],
+      default: "active",
+    },
+    lifecycleNote: { type: String, default: "" },
+    lifecycleUpdatedAt: { type: Date, default: null },
+
     // 🔹 Role-specific data
     studentProfile: {
       type: studentProfileSchema,
@@ -122,6 +130,17 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    linkedStudents: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", default: [] }],
+
+    promotionHistory: [
+      {
+        fromClass: { type: mongoose.Schema.Types.ObjectId, ref: "Class" },
+        toClass: { type: mongoose.Schema.Types.ObjectId, ref: "Class" },
+        promotedAt: { type: Date, default: Date.now },
+        _id: false,
+      },
+    ],
+
     onboarding: {
       status: { type: String, enum: ['pending', 'under_review', 'approved', 'rejected'], default: 'pending' },
       submittedAt: { type: Date, default: null },
@@ -129,11 +148,18 @@ const userSchema = new mongoose.Schema(
       rejectionReason: { type: String, default: '' },
       transitions: [onboardingTransitionSchema],
     },
+
+    emailOptOut: { type: [String], default: [] },
+
+    // QR attendance
+    qrToken: { type: String, default: null },
+    qrActive: { type: Boolean, default: true },
   },
   { timestamps: true }
 );
 
 userSchema.index({ institute: 1, role: 1 });
+userSchema.index({ qrToken: 1 }, { unique: true, sparse: true });
 
 // 🔐 Password Hash
 userSchema.pre("save", async function (next) {
