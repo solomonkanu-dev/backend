@@ -54,7 +54,7 @@ export const resetPassword = async (req, res, next) => {
 
 export const createInstitute = async (req, res, next) => {
   try {
-    const institute = await adminService.createInstitute(req.body, req.user);
+    const institute = await adminService.createInstitute(req.body, req);
     res.status(201).json({ message: 'Institute created successfully', institute });
   } catch (err) {
     next(err);
