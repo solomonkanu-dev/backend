@@ -2,9 +2,14 @@ import mongoose from 'mongoose';
 import * as repo from '../repositories/theme.repository.js';
 import { AppError } from '../errors/AppError.js';
 
+const resolveInstituteId = (userInstitute) => {
+  const id = userInstitute?._id ?? userInstitute;
+  return mongoose.Types.ObjectId.isValid(id) ? id : null;
+};
+
 export const createTheme = async (body, user) => {
   const { name, description, primary, secondary, accent, success, danger, warning, info, dark, light, fontFamily, fontSize, logo, favicon, backgroundImage } = body;
-  const instituteId = user?.institute?._id || user?.institute || body.institute;
+  const instituteId = resolveInstituteId(user?.institute) || body.institute;
 
   if (!name) throw new AppError('Theme name is required', 400);
   if (!instituteId) throw new AppError('Institute ID is required', 400);
@@ -22,7 +27,10 @@ export const getThemes = async (query, user) => {
   const q = {};
 
   if (instituteId) q.institute = instituteId;
-  else if (user?.institute) q.institute = user.institute?._id || user.institute;
+  else {
+    const instId = resolveInstituteId(user?.institute);
+    if (instId) q.institute = instId;
+  }
   if (isActive !== undefined) q.isActive = isActive === 'true';
 
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -42,7 +50,7 @@ export const getThemeById = async (id, user) => {
   const theme = await repo.findById(id);
   if (!theme) throw new AppError('Theme not found', 404);
 
-  const userInstId = user?.institute?._id || user?.institute;
+  const userInstId = resolveInstituteId(user?.institute);
   if (userInstId && theme.institute.toString() !== userInstId.toString()) {
     throw new AppError('Access denied', 403);
   }
@@ -51,7 +59,7 @@ export const getThemeById = async (id, user) => {
 };
 
 export const getActiveTheme = async (user, queryInstitute) => {
-  const instituteId = user?.institute?._id || user?.institute || queryInstitute;
+  const instituteId = resolveInstituteId(user?.institute) || queryInstitute;
   if (!instituteId) throw new AppError('Institute ID is required', 400);
 
   const theme = await repo.findActive(instituteId);
@@ -65,8 +73,8 @@ export const updateTheme = async (id, body, user) => {
   const theme = await repo.findById(id);
   if (!theme) throw new AppError('Theme not found', 404);
 
-  const userInstituteId = user.institute?._id || user.institute;
-  if (theme.institute.toString() !== userInstituteId.toString()) throw new AppError('Access denied', 403);
+  const userInstituteId = resolveInstituteId(user?.institute);
+  if (!userInstituteId || theme.institute.toString() !== userInstituteId.toString()) throw new AppError('Access denied', 403);
 
   const { name, description, primary, secondary, accent, success, danger, warning, info, dark, light, fontFamily, fontSize, logo, favicon, backgroundImage, isActive } = body;
 
@@ -104,8 +112,8 @@ export const deleteTheme = async (id, user) => {
   const theme = await repo.findById(id);
   if (!theme) throw new AppError('Theme not found', 404);
 
-  const userInstituteId = user.institute?._id || user.institute;
-  if (theme.institute.toString() !== userInstituteId.toString()) throw new AppError('Access denied', 403);
+  const userInstituteId = resolveInstituteId(user?.institute);
+  if (!userInstituteId || theme.institute.toString() !== userInstituteId.toString()) throw new AppError('Access denied', 403);
 
   await theme.deleteOne();
   return theme;

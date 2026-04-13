@@ -44,7 +44,7 @@ const PORT = process.env.PORT || 8080;
     const server = createServer(app);
     initSocket(server);
 
-    server.listen(PORT, () => {
+    server.listen(PORT, '0.0.0.0', () => {
       logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'}`);
     });
 

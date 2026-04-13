@@ -53,7 +53,7 @@ export const aggregateFeeByClass = (instituteId) =>
       },
     },
     { $lookup: { from: 'classes', localField: '_id', foreignField: '_id', as: 'classInfo' } },
-    { $unwind: { path: '$classInfo', preserveNullAndEmpty: true } },
+    { $unwind: { path: '$classInfo', preserveNullAndEmptyArrays: true } },
     {
       $project: {
         classId: '$_id',

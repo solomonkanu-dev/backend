@@ -43,10 +43,9 @@ import { maintenanceCheck } from "./middlewares/maintenanceCheck.js";
 
 const app = express();
 
-// const accessLogStream = fs.createWriteStream(
-//   path.join(__dirname, "access.log"),
-//   { flag: "a" },
-// );
+// Trust the first proxy hop (Fly.io / Railway / Render / Nginx).
+// Required so express-rate-limit can read X-Forwarded-For correctly.
+app.set("trust proxy", 1);
 
 // Middlewares
 app.use(helmet());
