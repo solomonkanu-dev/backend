@@ -32,36 +32,15 @@ export const scanQR = async ({ qrToken, classId }, user) => {
   const today = todayDateOnly();
   const instituteId = user.institute?._id || user.institute;
 
-  let attendance = await repo.findTodayAttendance(classId, instituteId, today);
+  const { alreadyPresent } = await repo.markStudentPresentAtomic(
+    classId, instituteId, today, student._id, user._id
+  );
 
-  if (!attendance) {
-    attendance = await repo.createAttendance({
-      class: classId,
-      institute: instituteId,
-      date: today,
-      type: 'student',
-      subject: null,
-      markedBy: user._id,
-      records: [{ student: student._id, status: 'present' }],
-    });
-    return { message: `Marked present: ${student.fullName}`, student: { _id: student._id, fullName: student.fullName }, alreadyPresent: false, created: true };
-  }
-
-  const existingRecord = attendance.records.find((r) => String(r.student) === String(student._id));
-
-  if (existingRecord) {
-    if (existingRecord.status === 'present') {
-      return { message: `${student.fullName} is already marked present`, student: { _id: student._id, fullName: student.fullName }, alreadyPresent: true };
-    }
-    existingRecord.status = 'present';
-  } else {
-    attendance.records.push({ student: student._id, status: 'present' });
-  }
-
-  attendance.markedBy = user._id;
-  await attendance.save();
-
-  return { message: `Marked present: ${student.fullName}`, student: { _id: student._id, fullName: student.fullName }, alreadyPresent: false };
+  return {
+    message: alreadyPresent ? `${student.fullName} is already marked present` : `Marked present: ${student.fullName}`,
+    student: { _id: student._id, fullName: student.fullName },
+    alreadyPresent,
+  };
 };
 
 export const finalizeQRAttendance = async ({ classId, date }, user) => {
