@@ -106,7 +106,7 @@ export const getSystemOverview = async () => {
     feeStats, salaryStats,
   ] = await Promise.all([
     repo.countInstitutes(),
-    repo.countInstitutes({ isActive: true }),
+    repo.countInstitutes({ onboardingCompleted: true }),
     repo.countUsers({ role: 'admin' }),
     repo.countUsers({ role: 'admin', isActive: true }),
     repo.countUsers({ role: 'admin', isActive: false }),
