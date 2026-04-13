@@ -6,6 +6,18 @@ export const submitAssignmentRules = [
   body('content').optional().isString(),
 ];
 
+export const resubmitRules = [
+  param('submissionId').isMongoId().withMessage('Invalid submission ID'),
+  body().custom((_, { req }) => {
+    if (!req.body.content && !req.body.fileUrl) {
+      throw new Error('content or fileUrl is required');
+    }
+    return true;
+  }),
+  body('fileUrl').optional().isURL().withMessage('fileUrl must be a valid URL'),
+  body('content').optional().isString(),
+];
+
 export const gradeSubmissionRules = [
   param('submissionId').isMongoId().withMessage('Invalid submission ID'),
   // Accept either 'score' or 'marks' for frontend compatibility

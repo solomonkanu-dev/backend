@@ -4,11 +4,13 @@ export const login = async (req, res, next) => {
   try {
     const { token, user } = await authService.login(req.body, req);
 
+    const isProduction = process.env.NODE_ENV === 'production';
     res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      httpOnly: true,         // JS cannot read this cookie — blocks XSS token theft
+      secure: isProduction,   // HTTPS only in production
+      sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-origin in prod
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in ms
     });
 
     res.json({ statusCode: 200, token, user });
@@ -29,10 +31,11 @@ export const getMe = async (req, res, next) => {
 export const logout = (req, res) => {
   authService.logout(req);
 
+  const isProduction = process.env.NODE_ENV === 'production';
   res.cookie('token', '', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
     path: '/',
     expires: new Date(0),
   });

@@ -7,6 +7,7 @@ export const submitAssignment = async (body, user) => {
   }
 
   const { assignmentId, fileUrl, content } = body;
+  if (!content && !fileUrl) throw new AppError('Content or file is required', 400);
 
   const assignment = await submissionRepo.findAssignmentForInstitute(assignmentId, user.institute);
   if (!assignment || assignment.status !== 'published') {
@@ -26,6 +27,30 @@ export const submitAssignment = async (body, user) => {
     isLate,
     status: 'pending',
   });
+};
+
+export const resubmitAssignment = async (submissionId, body, user) => {
+  if (user.role !== 'student') throw new AppError('Only students can resubmit', 403);
+
+  const { fileUrl, content } = body;
+  if (!content && !fileUrl) throw new AppError('Content or file is required', 400);
+
+  const submission = await submissionRepo.findByIdWithAssignment(submissionId);
+  if (!submission) throw new AppError('Submission not found', 404);
+  if (String(submission.student) !== String(user._id)) throw new AppError('Access denied', 403);
+
+  if (new Date() > new Date(submission.assignment.dueDate)) {
+    throw new AppError('Cannot resubmit after the due date', 400);
+  }
+
+  submission.content = content || '';
+  submission.fileUrl = fileUrl || '';
+  submission.isLate = false;
+  submission.status = 'pending';
+  submission.score = null;
+  submission.feedback = '';
+
+  return submissionRepo.save(submission);
 };
 
 export const gradeSubmission = async (submissionId, body, user) => {

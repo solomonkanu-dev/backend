@@ -3,6 +3,7 @@ import { resolveGrade } from './grading.service.js';
 import * as resultRepo from '../repositories/result.repository.js';
 import User from '../models/user.js';
 import Subject from '../models/Subject.js';
+import AcademicTerm from '../models/AcademicTerm.js';
 import { logAudit } from '../utils/audit.js';
 import { sendEmailNotification } from '../utils/email.js';
 
@@ -12,7 +13,7 @@ export const assignMarks = async (body, req) => {
     throw new AppError('Access denied', 403);
   }
 
-  const { studentId, subjectId, classId, marksObtained } = body;
+  const { studentId, subjectId, classId, marksObtained, totalScore, termId } = body;
   const instituteId = user.institute?._id || user.institute;
 
   const student = await User.findOne({ _id: studentId, role: 'student', institute: instituteId });
@@ -25,26 +26,35 @@ export const assignMarks = async (body, req) => {
     throw new AppError('You are not assigned to this subject', 403);
   }
 
-  if (marksObtained > subject.totalMarks) {
-    throw new AppError('Marks exceed total marks', 400);
+  const effectiveTotalScore = totalScore ?? subject.totalMarks ?? 100;
+
+  if (marksObtained > effectiveTotalScore) {
+    throw new AppError(`Marks (${marksObtained}) exceed total (${effectiveTotalScore})`, 400);
   }
 
-  const percentage = subject.totalMarks > 0
-    ? Math.round((marksObtained / subject.totalMarks) * 100)
+  const percentage = effectiveTotalScore > 0
+    ? Math.round((marksObtained / effectiveTotalScore) * 100)
     : marksObtained;
 
   const grade = await resolveGrade(instituteId, percentage);
 
+  // Resolve term: use provided termId, fall back to current term
+  let resolvedTermId = termId ?? null;
+  if (!resolvedTermId) {
+    const currentTerm = await AcademicTerm.findOne({ institute: instituteId, isCurrent: true }).lean();
+    resolvedTermId = currentTerm?._id ?? null;
+  }
+
   const result = await resultRepo.findOneAndUpsert(
-    { student: studentId, subject: subjectId, class: classId },
-    { marksObtained, totalScore: subject.totalMarks, grade, institute: instituteId }
+    { student: studentId, subject: subjectId, class: classId, term: resolvedTermId },
+    { marksObtained, totalScore: effectiveTotalScore, grade, institute: instituteId }
   );
 
   logAudit(req, {
     action: 'ASSIGN_MARKS',
     entity: 'Result',
     entityId: result._id,
-    description: `Assigned ${marksObtained} marks (grade ${grade}) to student ${studentId} for subject ${subjectId}`,
+    description: `Assigned ${marksObtained}/${effectiveTotalScore} (${percentage}%, grade ${grade}) to student ${studentId} for subject ${subjectId}`,
     statusCode: 200,
   });
 
@@ -61,7 +71,7 @@ export const assignMarks = async (body, req) => {
       studentName: student.fullName,
       subject: subject.name,
       marksObtained,
-      totalMarks: subject.totalMarks ?? 100,
+      totalMarks: effectiveTotalScore,
       grade: result.grade ?? 'N/A',
     },
   }).catch(() => {});

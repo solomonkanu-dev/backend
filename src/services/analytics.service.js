@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
 import * as repo from '../repositories/analytics.repository.js';
+import { cacheGet, cacheSet } from '../utils/cache.js';
+
+const ANALYTICS_TTL = 300; // 5 minutes
 
 function parseRange(from, to) {
   const now = new Date();
@@ -25,8 +28,20 @@ function instituteFilter(user, queryInstitution) {
   return null;
 }
 
+function analyticsKey(type, instId, query) {
+  const inst = instId ? instId.toString() : 'all';
+  const from = query.from || 'default';
+  const to = query.to || 'default';
+  return `analytics:${type}:${inst}:${from}:${to}`;
+}
+
 export const getAttendanceSummary = async (user, query) => {
   const instId = instituteFilter(user, query.institution);
+  const cacheKey = analyticsKey('attendance', instId, query);
+
+  const cached = await cacheGet(cacheKey);
+  if (cached) return cached;
+
   const { start, end } = parseRange(query.from, query.to);
   const { start: prevStart, end: prevEnd } = prevPeriod(start, end);
 
@@ -49,16 +64,24 @@ export const getAttendanceSummary = async (user, query) => {
   const prevPresent = previous[0]?.present ?? 0;
   const prevRate = prevTotal > 0 ? parseFloat(((prevPresent / prevTotal) * 100).toFixed(1)) : 0;
 
-  return {
+  const result = {
     period: { from: start, to: end },
     summary: { total, present, absent, attendanceRate: rate },
     delta: { attendanceRate: delta(rate, prevRate), present: delta(present, prevPresent) },
     byClass,
   };
+
+  await cacheSet(cacheKey, result, ANALYTICS_TTL);
+  return result;
 };
 
 export const getFeeDefaults = async (user, query) => {
   const instId = instituteFilter(user, query.institution);
+  const cacheKey = analyticsKey('fees', instId, query);
+
+  const cached = await cacheGet(cacheKey);
+  if (cached) return cached;
+
   const { start, end } = parseRange(query.from, query.to);
   const { start: prevStart, end: prevEnd } = prevPeriod(start, end);
 
@@ -96,7 +119,7 @@ export const getFeeDefaults = async (user, query) => {
     byInstitute = await repo.aggregateFeeDefaultsByInstitute(baseMatch);
   }
 
-  return {
+  const result = {
     period: { from: start, to: end },
     summary: curr,
     delta: {
@@ -107,10 +130,18 @@ export const getFeeDefaults = async (user, query) => {
     byStatus: current.map((r) => ({ status: r._id, count: r.count, outstanding: r.totalOutstanding })),
     ...(byInstitute.length > 0 && { topDefaultingInstitutes: byInstitute }),
   };
+
+  await cacheSet(cacheKey, result, ANALYTICS_TTL);
+  return result;
 };
 
 export const getAssignmentCompletion = async (user, query) => {
   const instId = instituteFilter(user, query.institution);
+  const cacheKey = analyticsKey('assignments', instId, query);
+
+  const cached = await cacheGet(cacheKey);
+  if (cached) return cached;
+
   const { start, end } = parseRange(query.from, query.to);
   const { start: prevStart, end: prevEnd } = prevPeriod(start, end);
 
@@ -156,7 +187,7 @@ export const getAssignmentCompletion = async (user, query) => {
 
   const byClass = await repo.aggregateSubmissionsByClass(assignmentIds);
 
-  return {
+  const result = {
     period: { from: start, to: end },
     summary: {
       totalAssignments,
@@ -172,11 +203,19 @@ export const getAssignmentCompletion = async (user, query) => {
     },
     byClass,
   };
+
+  await cacheSet(cacheKey, result, ANALYTICS_TTL);
+  return result;
 };
 
 export const getEnrollmentTrends = async (user, query) => {
   const instId = instituteFilter(user, query.institution);
   const cohort = query.cohort;
+  const cacheKey = `${analyticsKey('enrollment', instId, query)}:${cohort || 'all'}`;
+
+  const cached = await cacheGet(cacheKey);
+  if (cached) return cached;
+
   const { start, end } = parseRange(query.from, query.to);
   const { start: prevStart, end: prevEnd } = prevPeriod(start, end);
 
@@ -203,7 +242,7 @@ export const getEnrollmentTrends = async (user, query) => {
     byInstitute = await repo.aggregateEnrollmentByInstitute(baseMatch);
   }
 
-  return {
+  const result = {
     period: { from: start, to: end },
     summary: {
       totalEnrolled: curr.total,
@@ -216,4 +255,7 @@ export const getEnrollmentTrends = async (user, query) => {
     ...(byClass.length > 0 && { byClass }),
     ...(byInstitute.length > 0 && { byInstitute }),
   };
+
+  await cacheSet(cacheKey, result, ANALYTICS_TTL);
+  return result;
 };

@@ -25,6 +25,7 @@ import {
   suspendUser,
   unsuspendUser,
   deleteUser,
+  updateMyProfile,
 } from "../controllers/admin.controller.js";
 import auth from "../middlewares/auth.js";
 import { adminOnly } from "../middlewares/adminOnly.js";
@@ -47,7 +48,7 @@ import {
   getDefaulters,
   getCollectionTrend,
 } from "../controllers/feeAnalysis.controller.js";
-import { requestAdminSignupRules, createInstituteRules, feesArrayRules, assignFeeToStudentRules, resetPasswordRules, validate } from "../validators/admin.validator.js";
+import { requestAdminSignupRules, createInstituteRules, feesArrayRules, assignFeeToStudentRules, resetPasswordRules, createStudentRules, createLecturerRules, validate } from "../validators/admin.validator.js";
 import { updateStudentLifecycle, getClassRankings, getReportCard, updateStudent, updateLecturer, createParent, getParents, linkStudentToParent, unlinkStudentFromParent, revokeParentAccess, restoreParentAccess, bulkPromoteStudents, getPromotionEligibility } from "../controllers/admin.controller.js";
 import { recordPayment, getStudentPayments, getPaymentReceipt } from "../controllers/feePayment.controller.js";
 import { createOrUpdateTimetable, updateTimetable, deleteTimetable } from "../controllers/timetable.controller.js";
@@ -61,9 +62,10 @@ const router = Router();
  */
 
 router.post("/admin-request", requestAdminSignupRules, validate, requestAdminSignup);
+router.patch("/profile", auth, updateMyProfile);
 
-router.post("/create-student", auth, adminOnly, enforcePlanLimits('students'), createStudent);
-router.post("/create-lecturer", auth, adminOnly, enforcePlanLimits('lecturers'), createLecturer);
+router.post("/create-student", auth, adminOnly, enforcePlanLimits('students'), createStudentRules, validate, createStudent);
+router.post("/create-lecturer", auth, adminOnly, enforcePlanLimits('lecturers'), createLecturerRules, validate, createLecturer);
 
 /**
  * Admin resets password

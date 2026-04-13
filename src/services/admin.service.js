@@ -83,10 +83,11 @@ export const getAllStudents = async (query, user) => {
   return { data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
 };
 
-export const getStudentById = async (studentId) => {
-  const student = await repo.findStudentById(studentId);
+export const getStudentById = async (studentId, user) => {
+  const instituteId = user.institute?._id || user.institute;
+  const student = await repo.findUserOne({ _id: studentId, institute: instituteId, role: 'student' });
   if (!student) throw new AppError('Student not found', 404);
-  return student;
+  return repo.findStudentById(studentId);
 };
 
 export const getStudentAssignments = async (studentId, user) => {
@@ -191,11 +192,26 @@ export const getLecturerById = async (lecturerId, user) => {
   return lecturer;
 };
 
-export const updateLecturerProfile = async (lecturerId, body) => {
-  const user = await repo.findUserById(lecturerId);
-  if (!user || user.role !== 'lecturer') throw new AppError('Lecturer not found', 404);
-  user.lecturerProfile = body;
+export const updateLecturerProfile = async (lecturerId, body, req) => {
+  const instituteId = req.user.institute?._id || req.user.institute;
+  const user = await repo.findUserOne({ _id: lecturerId, institute: instituteId, role: 'lecturer' });
+  if (!user) throw new AppError('Lecturer not found', 404);
+  const { employeeId, department, position, dateOfJoining, dateOfBirth, gender, maritalStatus, bloodGroup, phoneNumber, address } = body;
+  user.lecturerProfile = {
+    ...(user.lecturerProfile?.toObject?.() ?? user.lecturerProfile ?? {}),
+    ...(employeeId !== undefined && { employeeId }),
+    ...(department !== undefined && { department }),
+    ...(position !== undefined && { position }),
+    ...(dateOfJoining !== undefined && { dateOfJoining }),
+    ...(dateOfBirth !== undefined && { dateOfBirth }),
+    ...(gender !== undefined && { gender }),
+    ...(maritalStatus !== undefined && { maritalStatus }),
+    ...(bloodGroup !== undefined && { bloodGroup }),
+    ...(phoneNumber !== undefined && { phoneNumber }),
+    ...(address !== undefined && { address }),
+  };
   await user.save();
+  logAudit(req, { action: 'UPDATE_LECTURER_PROFILE', entity: 'User', entityId: lecturerId, description: `Updated profile for lecturer ${user.fullName}`, statusCode: 200 });
   return user;
 };
 
@@ -352,9 +368,9 @@ export const getStudentClasses = async (studentId) => {
 
 export const getAllAssignments = () => repo.findAllAssignments();
 
-export const getResultsByClass = (classId, user) => {
+export const getResultsByClass = (classId, user, termId) => {
   const instituteId = user.institute?._id || user.institute;
-  return repo.findResultsByClass(classId, instituteId);
+  return repo.findResultsByClass(classId, instituteId, termId);
 };
 
 export const getResultsBySubject = (subjectId, user) => {
@@ -362,9 +378,9 @@ export const getResultsBySubject = (subjectId, user) => {
   return repo.findResultsBySubject(subjectId, instituteId);
 };
 
-export const getClassRankings = async (classId, user) => {
+export const getClassRankings = async (classId, user, termId) => {
   const instituteId = user.institute?._id || user.institute;
-  const results = await repo.findResultsForRanking(classId, instituteId);
+  const results = await repo.findResultsForRanking(classId, instituteId, termId);
   const totals = {};
   results.forEach((r) => {
     const sid = String(r.student?._id ?? r.student);
@@ -385,12 +401,15 @@ export const getReportCard = async (studentId, user) => {
   const student = await repo.findUserOne({ _id: studentId, institute: user.institute, role: 'student' });
   if (!student) throw new AppError('Student not found', 404);
 
-  await student.populate('class', 'name');
+  await student.populate({ path: 'class', select: 'name lecturer', populate: { path: 'lecturer', select: 'fullName' } });
   const studentObj = student.toObject ? student.toObject() : student;
 
-  const institute = await repo.findInstituteById(user.institute);
-  const results = await repo.findResultsByStudentAndInstitute(studentId, user.institute);
-  const attendanceRecords = await repo.findAttendanceForReportCard(user.institute);
+  const [institute, terms, results, attendanceRecords] = await Promise.all([
+    repo.findInstituteById(user.institute),
+    repo.findTermsByInstitute(user.institute),
+    repo.findResultsByStudentAndInstitute(studentId, user.institute),
+    repo.findAttendanceForReportCard(user.institute),
+  ]);
 
   const totalClasses = attendanceRecords.length;
   const presentCount = attendanceRecords.reduce((acc, record) => {
@@ -399,6 +418,7 @@ export const getReportCard = async (studentId, user) => {
   }, 0);
   const attendance = { present: presentCount, total: totalClasses, percentage: totalClasses > 0 ? Math.round((presentCount / totalClasses) * 100) : 0 };
 
+  // Position uses annual totals (all terms combined)
   const classmates = await repo.findResultsForClassTotals(studentObj.class?._id ?? studentObj.class, user.institute);
   const classTotals = {};
   classmates.forEach((r) => { const sid = String(r.student); classTotals[sid] = (classTotals[sid] ?? 0) + (r.marksObtained ?? 0); });
@@ -408,7 +428,22 @@ export const getReportCard = async (studentId, user) => {
   const higherCount = Object.values(classTotals).filter((t) => t > myTotal).length;
   const position = { rank: outOf > 0 ? higherCount + 1 : null, outOf };
 
-  return { student: studentObj, institute, results, attendance, position, generatedAt: new Date() };
+  return {
+    student: studentObj,
+    institute,
+    terms: terms.map((t) => ({ _id: t._id, name: t.name, academicYear: t.academicYear })),
+    results: results.map((r) => ({
+      _id: r._id,
+      subject: r.subject,
+      term: r.term ? { _id: r.term._id, name: r.term.name, academicYear: r.term.academicYear } : null,
+      marksObtained: r.marksObtained,
+      totalScore: r.totalScore ?? 100,
+      grade: r.grade,
+    })),
+    attendance,
+    position,
+    generatedAt: new Date(),
+  };
 };
 
 // ─── Fees ─────────────────────────────────────────────────────────────────────
@@ -644,4 +679,17 @@ export const restoreParentAccess = async (parentId, user) => {
   if (!parent) throw new AppError('Parent not found', 404);
   parent.isActive = true;
   await parent.save();
+};
+
+export const updateMyProfile = async (userId, { fullName, email }) => {
+  const user = await repo.findUserOne({ _id: userId });
+  if (!user) throw new AppError('User not found', 404);
+  if (email && email !== user.email) {
+    const exists = await repo.findUserOne({ email, _id: { $ne: userId } });
+    if (exists) throw new AppError('Email already in use', 409);
+    user.email = email;
+  }
+  if (fullName) user.fullName = fullName;
+  await user.save();
+  return user;
 };

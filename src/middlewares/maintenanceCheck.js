@@ -1,18 +1,20 @@
 import SystemConfig from '../models/SystemConfig.js';
+import { cacheGet, cacheSet, cacheDel } from '../utils/cache.js';
 
-let cachedConfig = null;
-let lastFetched = 0;
+const CACHE_KEY = 'maintenance:global';
+const CACHE_TTL = 30; // seconds
 
 const loadConfig = async () => {
-  if (!cachedConfig || Date.now() - lastFetched > 30000) {
-    cachedConfig = await SystemConfig.findOne({ key: 'global' });
-    lastFetched = Date.now();
-  }
-  return cachedConfig;
+  const cached = await cacheGet(CACHE_KEY);
+  if (cached) return cached;
+
+  const config = await SystemConfig.findOne({ key: 'global' });
+  if (config) await cacheSet(CACHE_KEY, config, CACHE_TTL);
+  return config;
 };
 
-export const invalidateMaintenanceCache = () => {
-  lastFetched = 0;
+export const invalidateMaintenanceCache = async () => {
+  await cacheDel(CACHE_KEY);
 };
 
 export const maintenanceCheck = async (req, res, next) => {

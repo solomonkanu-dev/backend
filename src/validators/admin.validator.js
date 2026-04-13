@@ -3,7 +3,18 @@ import { body, param, validationResult } from 'express-validator';
 export const requestAdminSignupRules = [
   body('fullName').notEmpty().withMessage('Full name required'),
   body('email').isEmail().withMessage('Valid email required'),
-  body('password').isLength({ min: 6 }).withMessage('Password min 6 chars'),
+  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+];
+
+export const createStudentRules = [
+  body('fullName').notEmpty().withMessage('Full name is required'),
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('classId').isMongoId().withMessage('Valid class ID is required'),
+];
+
+export const createLecturerRules = [
+  body('fullName').notEmpty().withMessage('Full name is required'),
+  body('email').isEmail().withMessage('Valid email is required'),
 ];
 
 export const createInstituteRules = [
@@ -29,7 +40,7 @@ export const assignFeeToStudentRules = [
 
 export const resetPasswordRules = [
   param('userId').isMongoId().withMessage('Invalid user ID'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
 ];
 
 export const validate = (req, res, next) => {

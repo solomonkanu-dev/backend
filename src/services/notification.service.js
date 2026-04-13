@@ -1,5 +1,6 @@
 import * as repo from '../repositories/notification.repository.js';
 import { AppError } from '../errors/AppError.js';
+import { getIO } from '../socket.js';
 
 export const getMyNotifications = async (userId, query) => {
   const page = parseInt(query.page) || 1;
@@ -28,9 +29,22 @@ export const markNotificationRead = async (id, userId) => {
   notification.isRead = true;
   notification.readAt = new Date();
   await notification.save();
+
+  // Push to other open tabs / devices of the same user
+  const io = getIO();
+  if (io) {
+    io.to(`user:${userId}`).emit('notification_read', { _id: id });
+  }
 };
 
-export const markAllRead = (userId) => repo.updateManyRead(userId);
+export const markAllRead = async (userId) => {
+  await repo.updateManyRead(userId);
+
+  const io = getIO();
+  if (io) {
+    io.to(`user:${userId}`).emit('notifications_all_read');
+  }
+};
 
 export const deleteNotification = async (id, userId) => {
   const notification = await repo.findById(id);
@@ -38,4 +52,9 @@ export const deleteNotification = async (id, userId) => {
   if (notification.recipient.toString() !== userId.toString()) throw new AppError('Access denied', 403);
 
   await notification.deleteOne();
+
+  const io = getIO();
+  if (io) {
+    io.to(`user:${userId}`).emit('notification_deleted', { _id: id });
+  }
 };

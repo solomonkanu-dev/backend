@@ -36,7 +36,7 @@ export const createLecturer = async (req, res, next) => {
 
 export const updateLecturerProfile = async (req, res, next) => {
   try {
-    const user = await adminService.updateLecturerProfile(req.params.id, req.body);
+    const user = await adminService.updateLecturerProfile(req.params.id, req.body, req);
     res.json({ message: 'Lecturer profile updated successfully', user });
   } catch (err) {
     next(err);
@@ -90,7 +90,7 @@ export const getLecturerById = async (req, res, next) => {
 
 export const getStudentById = async (req, res, next) => {
   try {
-    const data = await adminService.getStudentById(req.params.studentId);
+    const data = await adminService.getStudentById(req.params.studentId, req.user);
     res.json(data);
   } catch (err) {
     next(err);
@@ -171,8 +171,8 @@ export const getAllAssignments = async (req, res, next) => {
 
 export const getResultsByClass = async (req, res, next) => {
   try {
-    const data = await adminService.getResultsByClass(req.params.classId, req.user);
-    res.json(data);
+    const data = await adminService.getResultsByClass(req.params.classId, req.user, req.query.termId);
+    res.json({ data });
   } catch (err) {
     next(err);
   }
@@ -278,7 +278,7 @@ export const updateStudentLifecycle = async (req, res, next) => {
 
 export const getClassRankings = async (req, res, next) => {
   try {
-    const result = await adminService.getClassRankings(req.params.classId, req.user);
+    const result = await adminService.getClassRankings(req.params.classId, req.user, req.query.termId);
     res.json(result);
   } catch (err) {
     next(err);
@@ -383,6 +383,14 @@ export const restoreParentAccess = async (req, res, next) => {
   try {
     await adminService.restoreParentAccess(req.params.parentId, req.user);
     res.json({ message: 'Parent access restored' });
+  } catch (err) {
+    next(err);
+  }
+};
+export const updateMyProfile = async (req, res, next) => {
+  try {
+    const user = await adminService.updateMyProfile(req.user._id, req.body);
+    res.json({ message: 'Profile updated successfully', user });
   } catch (err) {
     next(err);
   }

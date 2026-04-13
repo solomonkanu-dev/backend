@@ -5,7 +5,7 @@ const auth = async (req, res, next) => {
   try {
     let token;
 
-    // 1️⃣ Check Authorization header
+    // 1. Check Authorization header (used by mobile / non-browser clients)
     if (
       req.headers.authorization &&
       req.headers.authorization.startsWith("Bearer ")
@@ -13,7 +13,7 @@ const auth = async (req, res, next) => {
       token = req.headers.authorization.split(" ")[1];
     }
 
-    // 2️⃣ Check cookie
+    // 2. Fall back to HTTP-only cookie (used by browser clients)
     if (!token && req.cookies?.token) {
       token = req.cookies.token;
     }

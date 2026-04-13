@@ -1,6 +1,7 @@
 import User from '../models/user.js';
 import Institute from '../models/Institute.js';
 import Result from '../models/Result.js';
+import AcademicTerm from '../models/AcademicTerm.js';
 import StudentFee from '../models/StudentFee.js';
 import Attendance from '../models/Attendance.js';
 import FeePayment from '../models/FeePayment.js';
@@ -16,6 +17,7 @@ export const findMyResults = (filter) =>
   Result.find(filter)
     .populate('subject', 'name code totalMarks')
     .populate('class', 'name')
+    .populate('term', 'name academicYear')
     .lean();
 
 export const findMyPromotionHistory = (userId) =>
@@ -27,14 +29,18 @@ export const findMyPromotionHistory = (userId) =>
     .lean();
 
 export const findMyReportCardData = (studentId) =>
-  User.findById(studentId).populate('class', 'name').lean();
+  User.findById(studentId).populate({ path: 'class', select: 'name lecturer', populate: { path: 'lecturer', select: 'fullName' } }).lean();
 
 export const findInstituteById = (id) => Institute.findById(id).lean();
 
 export const findResultsForReportCard = (studentId, instituteId) =>
   Result.find({ student: studentId, institute: instituteId })
     .populate('subject', 'name code totalMarks')
+    .populate('term', 'name academicYear')
     .lean();
+
+export const findTermsByInstitute = (instituteId) =>
+  AcademicTerm.find({ institute: instituteId }).sort({ startDate: 1 }).lean();
 
 export const findAllAttendance = (instituteId) =>
   Attendance.find({ institute: instituteId }).lean();
@@ -56,5 +62,8 @@ export const findStudentFeeOne = (studentId, instituteId) =>
     .populate('fees.fee', 'title')
     .lean();
 
-export const findResultsForRanking = (classId, instituteId) =>
-  Result.find({ class: classId, institute: instituteId }).lean();
+export const findResultsForRanking = (classId, instituteId, termId) => {
+  const filter = { class: classId, institute: instituteId };
+  if (termId) filter.term = termId;
+  return Result.find(filter).lean();
+};

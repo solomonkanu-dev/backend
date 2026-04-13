@@ -5,6 +5,7 @@ import Subject from '../models/Subject.js';
 import Assignment from '../models/Assignment.js';
 import Submission from '../models/Submission.js';
 import Result from '../models/Result.js';
+import AcademicTerm from '../models/AcademicTerm.js';
 import FeeParticular from '../models/Fees.js';
 import Attendance from '../models/Attendance.js';
 import StudentFee from '../models/StudentFee.js';
@@ -20,7 +21,7 @@ export const findUserByIdAndInstitute = (id, institute, role) =>
   User.findOne({ _id: id, institute, role });
 
 export const findStudentById = (studentId) =>
-  User.findById(studentId).select('-password').populate('class', 'name');
+  User.findById(studentId).select('-password').populate({ path: 'class', select: 'name lecturer', populate: { path: 'lecturer', select: 'fullName' } });
 
 export const findLecturerById = (lecturerId, instituteId) =>
   User.findOne({ _id: lecturerId, institute: instituteId, role: 'lecturer' }).select('-password');
@@ -129,10 +130,15 @@ export const findSubmissions = (filter) => Submission.find(filter);
 
 // ─── Result ───────────────────────────────────────────────────────────────────
 
-export const findResultsByClass = (classId, instituteId) =>
-  Result.find({ class: classId, institute: instituteId })
-    .populate('student', 'fullName email')
-    .populate('subject', 'name totalMarks');
+// termId is optional — omit for all-terms (annual view)
+export const findResultsByClass = (classId, instituteId, termId) => {
+  const filter = { class: classId, institute: instituteId };
+  if (termId) filter.term = termId;
+  return Result.find(filter)
+    .populate('student', 'fullName email profilePhoto')
+    .populate('subject', 'name code totalMarks')
+    .populate('term', 'name academicYear');
+};
 
 export const findResultsBySubject = (subjectId, instituteId) =>
   Result.find({ subject: subjectId, institute: instituteId })
@@ -142,15 +148,25 @@ export const findResultsBySubject = (subjectId, instituteId) =>
 export const findResultsByStudentAndInstitute = (studentId, instituteId) =>
   Result.find({ student: studentId, institute: instituteId })
     .populate('subject', 'name code totalMarks')
+    .populate('term', 'name academicYear')
     .lean();
 
-export const findResultsForRanking = (classId, instituteId) =>
-  Result.find({ class: classId, institute: instituteId })
+export const findResultsForRanking = (classId, instituteId, termId) => {
+  const filter = { class: classId, institute: instituteId };
+  if (termId) filter.term = termId;
+  return Result.find(filter)
     .populate('student', 'fullName profilePhoto studentProfile')
     .lean();
+};
 
-export const findResultsForClassTotals = (classId, instituteId) =>
-  Result.find({ class: classId, institute: instituteId }).lean();
+export const findResultsForClassTotals = (classId, instituteId, termId) => {
+  const filter = { class: classId, institute: instituteId };
+  if (termId) filter.term = termId;
+  return Result.find(filter).lean();
+};
+
+export const findTermsByInstitute = (instituteId) =>
+  AcademicTerm.find({ institute: instituteId }).sort({ startDate: 1 }).lean();
 
 export const findResultsByStudent = (studentId, instituteId) =>
   Result.find({ class: studentId, institute: instituteId }).lean();

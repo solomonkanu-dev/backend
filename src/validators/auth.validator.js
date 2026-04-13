@@ -8,7 +8,7 @@ export const loginRules = [
 export const requestAdminSignupRules = [
   body('fullName').notEmpty().withMessage('Full name required'),
   body('email').isEmail().withMessage('Valid email required'),
-  body('password').isLength({ min: 6 }).withMessage('Password min 6 chars'),
+  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
 ];
 
 export const validate = (req, res, next) => {

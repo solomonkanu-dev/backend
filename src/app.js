@@ -3,9 +3,12 @@ import fs from "fs";
 import path from "path";
 import helmet from "helmet";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import compression from "compression";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
+import { RedisStore } from "rate-limit-redis";
+import { getRedisClient } from "./config/redis.js";
 import adminRoutes from "./routes/admin.route.js";
 import authRoutes from "./routes/auth.route.js";
 import lecturerRoutes from "./routes/lecturer.route.js";
@@ -48,6 +51,7 @@ const app = express();
 // Middlewares
 app.use(helmet());
 app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(",") || [], credentials: true }));
+app.use(cookieParser());
 app.use(json({ limit: "10mb" }));
 app.use(urlencoded({ extended: true }));
 app.use(compression({ threshold: 1024 }));
@@ -56,18 +60,30 @@ if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// Rate limiter (basic)
+// Build a Redis store for rate-limit-redis; falls back to in-memory if Redis is unavailable
+const makeRateLimitStore = (prefix) => {
+  const client = getRedisClient();
+  if (!client) return undefined;
+  return new RedisStore({
+    prefix: `studman:rl:${prefix}:`,
+    sendCommand: (command, ...args) => client.call(command, ...args),
+  });
+};
+
+// General rate limiter — shared across all instances via Redis
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
+  store: makeRateLimitStore('general'),
 });
-// app.use(limiter);
+app.use(limiter);
 
 // Stricter rate limiter for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 15,
   message: "Too many attempts, please try again later",
+  store: makeRateLimitStore('auth'),
 });
 app.use("/api/v1/auth", authLimiter);
 
@@ -76,6 +92,7 @@ const analyticsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 150,
   message: "Too many analytics requests, please slow down",
+  store: makeRateLimitStore('analytics'),
 });
 app.use("/api/v1/analytics", analyticsLimiter);
 

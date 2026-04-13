@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { createServer } from 'http';
-import app from './app.js';
 import connectDB from './config/db.js';
+import { connectRedis } from './config/redis.js';
 import logger from './utils/logger.js';
 import seedPlans from './config/seedPlans.js';
 import { migrateIndexes } from './config/migrateIndexes.js';
@@ -23,6 +23,11 @@ const PORT = process.env.PORT || 8080;
 (async () => {
   try {
     await connectDB(process.env.MONGO_URI || 'mongodb://localhost:27017/myapp');
+
+    // Connect to Redis before app.js is evaluated so makeRateLimitStore
+    // sees a ready client. Falls back to in-memory if Redis is unavailable.
+    await connectRedis();
+    const { default: app } = await import('./app.js');
 
     await migrateIndexes();
 

@@ -33,9 +33,10 @@ export const getMyFees = async (req, res, next) => {
 
 export const getMyResults = async (req, res, next) => {
   try {
-    const data = req.query.classId
-      ? await studentService.getMyResultsByClass(req.query.classId, req.user)
-      : await studentService.getMyResults(req.user);
+    const { classId, termId } = req.query;
+    const data = classId
+      ? await studentService.getMyResultsByClass(classId, req.user, termId)
+      : await studentService.getMyResults(req.user, termId);
     res.json(data);
   } catch (err) {
     next(err);
@@ -80,7 +81,7 @@ export const getMyPaymentReceipt = async (req, res, next) => {
 
 export const getMyRanking = async (req, res, next) => {
   try {
-    const data = await studentService.getMyRanking(req.user);
+    const data = await studentService.getMyRanking(req.user, req.query.termId);
     res.json(data);
   } catch (err) {
     next(err);

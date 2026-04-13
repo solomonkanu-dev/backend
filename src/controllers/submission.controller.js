@@ -39,6 +39,19 @@ export const getSubmissionsForAssignment = async (req, res, next) => {
   }
 };
 
+export const resubmitAssignment = async (req, res, next) => {
+  try {
+    const submission = await submissionService.resubmitAssignment(
+      req.params.submissionId,
+      req.body,
+      req.user
+    );
+    res.json({ message: 'Assignment resubmitted successfully', submission });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getMySubmissions = async (req, res, next) => {
   try {
     const data = await submissionService.getMySubmissions(req.user);

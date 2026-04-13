@@ -24,6 +24,8 @@ export const findByStudent = (studentId) =>
 export const findByIdWithAssignment = (id) =>
   Submission.findById(id).populate('assignment');
 
+export const findById = (id) => Submission.findById(id);
+
 export const save = (doc) => doc.save();
 
 export const findAssignmentForInstitute = (assignmentId, institute) =>
