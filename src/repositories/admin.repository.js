@@ -114,8 +114,8 @@ export const countSubjects = (filter) => Subject.countDocuments(filter);
 
 // ─── Assignment ───────────────────────────────────────────────────────────────
 
-export const findAllAssignments = () =>
-  Assignment.find().populate('subject', 'name');
+export const findAllAssignments = (instituteId) =>
+  Assignment.find({ institute: instituteId }).populate('subject', 'name');
 
 export const findPublishedAssignmentsByClass = (classId, instituteId) =>
   Assignment.find({ class: classId, institute: instituteId, status: 'published' })

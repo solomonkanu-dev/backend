@@ -162,7 +162,7 @@ export const getStudentClasses = async (req, res, next) => {
 
 export const getAllAssignments = async (req, res, next) => {
   try {
-    const data = await adminService.getAllAssignments();
+    const data = await adminService.getAllAssignments(req.user);
     res.json(data);
   } catch (err) {
     next(err);

@@ -366,7 +366,10 @@ export const getStudentClasses = async (studentId) => {
 
 // ─── Results ──────────────────────────────────────────────────────────────────
 
-export const getAllAssignments = () => repo.findAllAssignments();
+export const getAllAssignments = (user) => {
+  const instituteId = user.institute?._id || user.institute;
+  return repo.findAllAssignments(instituteId);
+};
 
 export const getResultsByClass = (classId, user, termId) => {
   const instituteId = user.institute?._id || user.institute;
