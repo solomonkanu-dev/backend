@@ -75,7 +75,7 @@ export const createCheckout = async (planId, user, frontendBaseUrl) => {
     name: plan.displayName || plan.name,
     priceInMinorUnits,
     currency: 'SLE',
-    successUrl: `${frontendBaseUrl}/admin/plan/success?sessionId=${encodeURIComponent('SESSION_ID_PLACEHOLDER')}`,
+    successUrl: `${frontendBaseUrl}/admin/plan/success`,
     cancelUrl: `${frontendBaseUrl}/admin/plan/cancel`,
     reference,
     metadata: {
@@ -85,10 +85,7 @@ export const createCheckout = async (planId, user, frontendBaseUrl) => {
     },
   });
 
-  // Re-embed the real session ID into the successUrl now that we have it
-  const successUrl = `${frontendBaseUrl}/admin/plan/success?sessionId=${encodeURIComponent(session.id)}`;
-
-  return { checkoutUrl: session.redirectUrl, sessionId: session.id, successUrl };
+  return { checkoutUrl: session.redirectUrl, sessionId: session.id };
 };
 
 export const verifyAndActivatePlan = async (sessionId, user) => {
