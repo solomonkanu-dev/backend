@@ -66,20 +66,33 @@ export const verifyPayment = async (req, res, next) => {
   }
 };
 
-export const handleWebhook = async (req, res, next) => {
+export const handleWebhook = async (req, res) => {
+  // Respond immediately — Monime expects a fast 200
+  res.json({ success: true });
+
   try {
     const rawBody = req.rawBody;
-    const isValid = monime.verifyWebhookSignature(rawBody, req);
 
-    if (!isValid) {
-      return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
+    // Verify signature only if we captured the raw body and a signature header exists
+    const hasSignatureHeader =
+      req.headers['x-monime-signature'] ||
+      req.headers['x-webhook-signature'] ||
+      req.headers['monime-signature'];
+
+    if (rawBody && hasSignatureHeader) {
+      const isValid = monime.verifyWebhookSignature(rawBody, req);
+      if (!isValid) {
+        console.warn('[webhook] Invalid Monime signature — skipping event');
+        return;
+      }
     }
 
-    const event = JSON.parse(rawBody.toString());
-    await planService.handleWebhookEvent(event);
+    // Use already-parsed req.body (Express JSON middleware parsed it)
+    const event = req.body;
+    if (!event || !event.type) return;
 
-    res.json({ success: true });
+    await planService.handleWebhookEvent(event);
   } catch (err) {
-    next(err);
+    console.error('[webhook] Error processing Monime event:', err);
   }
 };

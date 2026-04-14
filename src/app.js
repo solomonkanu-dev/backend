@@ -54,7 +54,7 @@ app.use(cookieParser());
 app.use(json({
   limit: "10mb",
   verify: (req, _res, buf) => {
-    if (req.path === '/api/v1/plans/webhook') req.rawBody = buf;
+    if (req.originalUrl?.includes('/plans/webhook')) req.rawBody = buf;
   },
 }));
 app.use(urlencoded({ extended: true }));
