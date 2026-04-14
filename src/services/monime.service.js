@@ -11,7 +11,7 @@ const headers = (idempotencyKey) => ({
 });
 
 export const createCheckoutSession = async ({
-  name, priceInMinorUnits, currency = 'SLE',
+  name, description, priceInMinorUnits, currency = 'SLE',
   successUrl, cancelUrl, reference, metadata,
 }) => {
   const idempotencyKey = `checkout-${reference}`;
@@ -21,6 +21,7 @@ export const createCheckoutSession = async ({
     headers: headers(idempotencyKey),
     body: JSON.stringify({
       name,
+      ...(description && { description }),
       lineItems: [{ name, price: { value: priceInMinorUnits, currency }, quantity: 1 }],
       successUrl,
       cancelUrl,

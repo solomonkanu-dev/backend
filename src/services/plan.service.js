@@ -68,11 +68,17 @@ export const createCheckout = async (planId, user, frontendBaseUrl) => {
   const instituteId = (user.institute?._id || user.institute)?.toString();
   if (!instituteId) throw new AppError('No institute associated with your account', 400);
 
-  const reference = `inst-${instituteId}-plan-${plan._id}-${Date.now()}`;
+  const institute = await repo.findInstituteById(instituteId);
+  const instituteName = institute?.name || 'Institute';
+  const planLabel = plan.displayName || plan.name;
+
+  const slug = instituteName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const reference = `${slug}-${plan.name}-${Date.now()}`;
   const priceInMinorUnits = Math.round(plan.price * 100);
 
   const session = await monime.createCheckoutSession({
-    name: plan.displayName || plan.name,
+    name: `${planLabel} Plan`,
+    description: `${planLabel} plan subscription for ${instituteName}`,
     priceInMinorUnits,
     currency: 'SLE',
     successUrl: `${frontendBaseUrl}/api/payment/success`,
