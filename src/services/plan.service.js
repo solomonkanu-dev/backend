@@ -75,8 +75,8 @@ export const createCheckout = async (planId, user, frontendBaseUrl) => {
     name: plan.displayName || plan.name,
     priceInMinorUnits,
     currency: 'SLE',
-    successUrl: `${frontendBaseUrl}/admin/plan/success`,
-    cancelUrl: `${frontendBaseUrl}/admin/plan/cancel`,
+    successUrl: `${frontendBaseUrl}/api/payment/success`,
+    cancelUrl: `${frontendBaseUrl}/api/payment/cancel`,
     reference,
     metadata: {
       planId: plan._id.toString(),

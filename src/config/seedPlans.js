@@ -4,20 +4,20 @@ const plans = [
   {
     name: 'free',
     displayName: 'Free',
-    limits: { maxStudents: 50, maxLecturers: 5, maxClasses: 3, maxStorageMB: 100 },
+    limits: { maxStudents: 40, maxLecturers: 5, maxClasses: 3, maxStorageMB: 100 },
     price: 0,
   },
   {
     name: 'basic',
     displayName: 'Basic',
-    limits: { maxStudents: 200, maxLecturers: 20, maxClasses: 15, maxStorageMB: 500 },
-    price: 3500,
+    limits: { maxStudents: 100, maxLecturers: 10, maxClasses: 10, maxStorageMB: 500 },
+    price: 1,
   },
   {
     name: 'pro',
     displayName: 'Pro',
-    limits: { maxStudents: 1000, maxLecturers: 100, maxClasses: 100, maxStorageMB: 5000 },
-    price: 6000,
+    limits: { maxStudents: 200, maxLecturers:50, maxClasses: 20, maxStorageMB: 5000 },
+    price: 1,
   },
 ];
 
