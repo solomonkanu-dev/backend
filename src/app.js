@@ -51,7 +51,12 @@ app.set("trust proxy", 1);
 app.use(helmet());
 app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(",") || [], credentials: true }));
 app.use(cookieParser());
-app.use(json({ limit: "10mb" }));
+app.use(json({
+  limit: "10mb",
+  verify: (req, _res, buf) => {
+    if (req.path === '/api/v1/plans/webhook') req.rawBody = buf;
+  },
+}));
 app.use(urlencoded({ extended: true }));
 app.use(compression({ threshold: 1024 }));
 
