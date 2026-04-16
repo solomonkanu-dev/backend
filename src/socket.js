@@ -27,22 +27,30 @@ export function initSocket(server) {
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
-      if (!token) return next(new Error("Unauthorized"));
+      if (!token) {
+        console.warn("[socket] auth rejected: no token");
+        return next(new Error("Unauthorized"));
+      }
       const payload = jwt.verify(token, process.env.JWT_SECRET);
       const userId = payload.id || payload._id;
       const user = await User.findById(userId)
         .select("_id role fullName institute")
         .lean();
-      if (!user) return next(new Error("Unauthorized"));
+      if (!user) {
+        console.warn("[socket] auth rejected: user not found, id=", userId);
+        return next(new Error("Unauthorized"));
+      }
       socket.user = user;
       next();
-    } catch {
+    } catch (err) {
+      console.warn("[socket] auth rejected:", err.message);
       next(new Error("Unauthorized"));
     }
   });
 
   io.on("connection", async (socket) => {
     const { _id, role, fullName, institute: instituteId } = socket.user;
+    console.log(`[socket] connected: role=${role} id=${_id}`);
 
     // Join personal notification room
     socket.join(`user:${_id}`);
@@ -110,7 +118,8 @@ export function initSocket(server) {
       });
     });
 
-    socket.on("disconnect", () => {
+    socket.on("disconnect", (reason) => {
+      console.log(`[socket] disconnected: role=${role} id=${_id} reason=${reason}`);
       removeUser(socket.id);
       broadcastPresence();
     });
