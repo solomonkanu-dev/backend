@@ -80,7 +80,7 @@ const makeRateLimitStore = (prefix) => {
 // General rate limiter — shared across all instances via Redis
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 600,
   store: makeRateLimitStore('general'),
 });
 app.use(limiter);

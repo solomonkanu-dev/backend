@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import User from "./models/user.js";
+import Institute from "./models/Institute.js";
 import { addUser, removeUser, getOnlineSnapshot } from "./presence.js";
 
 let io;
@@ -21,7 +22,7 @@ export function initSocket(server) {
     connectionStateRecovery: {},
   });
 
-  // Auth middleware — verifies JWT from handshake.auth.token
+  // Auth middleware — same lean query as before, no populate (avoids issues with missing ref)
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -30,7 +31,6 @@ export function initSocket(server) {
       const userId = payload.id || payload._id;
       const user = await User.findById(userId)
         .select("_id role fullName institute")
-        .populate("institute", "name")
         .lean();
       if (!user) return next(new Error("Unauthorized"));
       socket.user = user;
@@ -40,8 +40,8 @@ export function initSocket(server) {
     }
   });
 
-  io.on("connection", (socket) => {
-    const { _id, role, fullName, institute } = socket.user;
+  io.on("connection", async (socket) => {
+    const { _id, role, fullName, institute: instituteId } = socket.user;
 
     // Each user joins their personal notification room
     socket.join(`user:${_id}`);
@@ -51,14 +51,22 @@ export function initSocket(server) {
       socket.join("room:super_admin");
     }
 
-    // Track presence
+    // For admins, fetch the institute name so it shows in the super-admin table
+    let instituteData = null;
+    if (role === "admin" && instituteId) {
+      try {
+        const inst = await Institute.findById(instituteId).select("name").lean();
+        if (inst) instituteData = { _id: String(inst._id), name: inst.name };
+      } catch {
+        // non-critical — continue without institute name
+      }
+    }
+
     addUser(socket.id, {
       userId:      _id,
       role,
       fullName,
-      institute:   institute
-        ? { _id: String(institute._id), name: institute.name }
-        : null,
+      institute:   instituteData,
       connectedAt: new Date(),
     });
     broadcastPresence();
