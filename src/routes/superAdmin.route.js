@@ -19,6 +19,7 @@ import {
   rejectAdminOnboarding,
   getAdminOnboardingList,
   getAdminOnboardingDetail,
+  getOnlineUsers,
 } from '../controllers/superAdmin.controller.js';
 import auth from '../middlewares/auth.js';
 import superAdminOnly from '../middlewares/superAdmin.js';
@@ -80,6 +81,7 @@ router.patch('/onboarding/:adminId/approve', auth, superAdminOnly, approveAdminO
 router.patch('/onboarding/:adminId/reject', auth, superAdminOnly, rejectAdminOnboarding);
 
 // System-wide monitoring
+router.get('/monitor/online-users', auth, superAdminOnly, getOnlineUsers);
 router.get('/monitor/overview', auth, superAdminOnly, getSystemOverview);
 router.get('/monitor/institutes', auth, superAdminOnly, getInstituteHealthReport);
 router.get('/monitor/institutes/:instituteId', auth, superAdminOnly, getInstituteDeepReport);

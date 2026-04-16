@@ -56,7 +56,7 @@ export const getClasses = async (req, res, next) => {
 
 export const getClassById = async (req, res, next) => {
   try {
-    const data = await classService.getClassById(req.params.id);
+    const data = await classService.getClassById(req.params.id, req.user);
     res.json(data);
   } catch (err) {
     next(err);

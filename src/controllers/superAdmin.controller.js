@@ -1,4 +1,5 @@
 import * as superAdminService from '../services/superAdmin.service.js';
+import { getOnlineSnapshot } from '../socket.js';
 
 export const superAdminLogin = async (req, res, next) => {
   try {
@@ -190,4 +191,8 @@ export const getInstituteById = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+export const getOnlineUsers = (req, res) => {
+  res.json(getOnlineSnapshot());
 };

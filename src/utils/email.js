@@ -1,9 +1,9 @@
 /**
  * Email notification utility — fire-and-forget, never throws.
- * Nodemailer is loaded dynamically so the app starts even if the package is absent.
+ * Uses Resend (https://resend.com) as the email transport.
  */
 
-// ─── HTML shell ──────────────────────────────────────────────────────────────
+// ─── HTML shell ───────────────────────────────────────────────────────────────
 
 function wrapHtml(instituteName, body) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
@@ -22,7 +22,7 @@ function wrapHtml(instituteName, body) {
 </body></html>`;
 }
 
-// ─── Template builder ─────────────────────────────────────────────────────────
+// ─── Template builder ──────────────────────────────────────────────────────────
 
 /**
  * @param {'feePayment'|'resultsPublished'|'announcement'|'assignmentPosted'|'attendanceAlert'|'test'} type
@@ -47,7 +47,7 @@ export function buildEmail(type, instituteName, data) {
             </tr>
             <tr style="border-bottom:1px solid #E2E8F0">
               <td style="padding:10px 0;color:#64748B;font-size:14px">Amount Paid</td>
-              <td style="padding:10px 0;color:#1E293B;font-weight:600;text-align:right">₦${Number(amount).toLocaleString()}</td>
+              <td style="padding:10px 0;color:#1E293B;font-weight:600;text-align:right">NLe${Number(amount).toLocaleString()}</td>
             </tr>
             <tr style="border-bottom:1px solid #E2E8F0">
               <td style="padding:10px 0;color:#64748B;font-size:14px">Payment Method</td>
@@ -55,7 +55,7 @@ export function buildEmail(type, instituteName, data) {
             </tr>
             <tr style="border-bottom:1px solid #E2E8F0">
               <td style="padding:10px 0;color:#64748B;font-size:14px">Remaining Balance</td>
-              <td style="padding:10px 0;color:${balance > 0 ? '#EF4444' : '#22C55E'};font-weight:600;text-align:right">₦${Number(balance).toLocaleString()}</td>
+              <td style="padding:10px 0;color:${balance > 0 ? '#EF4444' : '#22C55E'};font-weight:600;text-align:right">NLe${Number(balance).toLocaleString()}</td>
             </tr>
             <tr>
               <td style="padding:10px 0;color:#64748B;font-size:14px">Date</td>
@@ -165,33 +165,44 @@ export function buildEmail(type, instituteName, data) {
         subject: `Test Email — ${instituteName}`,
         html: wrapHtml(instituteName, `
           <h2 style="margin:0 0 16px;font-size:18px;color:#1E293B">Test Email</h2>
-          <p style="color:#475569">This is a test email from <strong>${instituteName}</strong>. Your SMTP configuration is working correctly.</p>
+          <p style="color:#475569">This is a test email from <strong>${instituteName}</strong>. Your email configuration is working correctly.</p>
         `),
       };
     }
   }
 }
 
+// ─── Resend client (singleton) ────────────────────────────────────────────────
+
+let _resend = null;
+async function getResend() {
+  if (!_resend) {
+    const { Resend } = await import('resend');
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+}
+
 // ─── Core send function ───────────────────────────────────────────────────────
 
 /**
- * Fire-and-forget email sender.
+ * Fire-and-forget email sender via Resend.
  * @param {{ instituteId: string, type: string, recipientId?: string, recipientEmail: string, instituteName: string, data: Record<string, any> }} opts
  */
 export async function sendEmailNotification({ instituteId, type, recipientId, recipientEmail, instituteName, data }) {
   try {
     if (!recipientEmail) return;
+    if (!process.env.RESEND_API_KEY) {
+      console.warn('[email] RESEND_API_KEY not configured — skipping email');
+      return;
+    }
 
     // Lazy-load models to avoid circular dependencies at startup
     const { default: NotificationSettings } = await import('../models/NotificationSettings.js');
-
     const settings = await NotificationSettings.findOne({ institute: instituteId }).lean();
 
-    // If no settings at all, or SMTP host not configured, skip silently
-    if (!settings || !settings.smtp?.host) return;
-
     // Check if this notification type is enabled
-    if (type !== 'test' && settings.enabled?.[type] === false) return;
+    if (type !== 'test' && settings?.enabled?.[type] === false) return;
 
     // Check user opt-out preference (only for non-critical types)
     const optOutTypes = ['announcement', 'assignmentPosted'];
@@ -201,38 +212,20 @@ export async function sendEmailNotification({ instituteId, type, recipientId, re
       if (user?.emailOptOut?.includes(type)) return;
     }
 
-    // Dynamically import nodemailer — if not installed, log warning and bail
-    let nodemailer;
-    try {
-      nodemailer = (await import('nodemailer')).default;
-    } catch {
-      console.warn('[email] nodemailer is not installed — skipping email notification');
-      return;
-    }
-
-    const { smtp } = settings;
     const { subject: emailSubject, html } = buildEmail(type, instituteName, data ?? {});
-
-    const transporter = nodemailer.createTransport({
-      host: smtp.host,
-      port: smtp.port ?? 587,
-      secure: smtp.secure ?? false,
-      auth: { user: smtp.user, pass: smtp.pass },
-    });
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@edupulse.com';
+    const from = `${instituteName} <${fromEmail}>`;
 
     let status = 'sent';
     let errorMsg = null;
 
     try {
-      await transporter.sendMail({
-        from: smtp.fromName ? `"${smtp.fromName}" <${smtp.fromEmail}>` : smtp.fromEmail,
-        to: recipientEmail,
-        subject: emailSubject,
-        html,
-      });
+      const resend = await getResend();
+      await resend.emails.send({ from, to: [recipientEmail], subject: emailSubject, html });
     } catch (sendErr) {
       status = 'failed';
       errorMsg = sendErr?.message ?? String(sendErr);
+      console.error('[email] Resend send error:', errorMsg);
     }
 
     // Log the attempt — best-effort, never throws
@@ -256,32 +249,26 @@ export async function sendEmailNotification({ instituteId, type, recipientId, re
   }
 }
 
-// ─── Direct transporter send (used by sendTestEmail controller) ───────────────
+// ─── Test email (used by settings controller) ─────────────────────────────────
 
 /**
- * Sends a test email using the provided smtp config directly.
+ * Sends a test email via Resend.
  * Returns { ok: true } or throws so the controller can surface the error.
  */
-export async function sendTestEmailDirect({ smtp, instituteName, toEmail }) {
-  let nodemailer;
-  try {
-    nodemailer = (await import('nodemailer')).default;
-  } catch {
-    throw new Error('nodemailer is not installed on the server');
+export async function sendTestEmailDirect({ instituteName, toEmail }) {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not configured on the server');
   }
 
-  const transporter = nodemailer.createTransport({
-    host: smtp.host,
-    port: smtp.port ?? 587,
-    secure: smtp.secure ?? false,
-    auth: { user: smtp.user, pass: smtp.pass },
-  });
+  const { Resend } = await import('resend');
+  const resend = new Resend(process.env.RESEND_API_KEY);
 
   const { subject, html } = buildEmail('test', instituteName, {});
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@edupulse.com';
 
-  await transporter.sendMail({
-    from: smtp.fromName ? `"${smtp.fromName}" <${smtp.fromEmail}>` : smtp.fromEmail,
-    to: toEmail,
+  await resend.emails.send({
+    from: `${instituteName} <${fromEmail}>`,
+    to: [toEmail],
     subject,
     html,
   });

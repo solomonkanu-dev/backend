@@ -21,6 +21,7 @@ export const submitAssignment = async (body, user) => {
 
   return submissionRepo.create({
     assignment: assignmentId,
+    institute: user.institute?._id || user.institute,
     student: user._id,
     fileUrl: fileUrl || '',
     content: content || '',

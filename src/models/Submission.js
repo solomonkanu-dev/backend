@@ -7,6 +7,12 @@ const submissionSchema = new mongoose.Schema(
       ref: "Assignment",
       required: true,
     },
+    institute: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Institute",
+      required: true,
+      index: true,
+    },
     student: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

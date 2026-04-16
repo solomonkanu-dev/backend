@@ -45,8 +45,9 @@ export const getInstituteClasses = async (user) =>
 export const getClasses = async (user) =>
   classRepo.findByInstituteWithLecturer(user.institute);
 
-export const getClassById = async (id) => {
-  const singleClass = await classRepo.findById(id);
+export const getClassById = async (id, user) => {
+  const instituteId = user.institute?._id || user.institute;
+  const singleClass = await classRepo.findByIdWithDetails(id, instituteId);
   if (!singleClass) throw new AppError('Class not found', 404);
   return singleClass;
 };

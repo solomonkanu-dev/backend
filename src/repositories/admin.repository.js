@@ -20,8 +20,8 @@ export const findUserById = (id) => User.findById(id);
 export const findUserByIdAndInstitute = (id, institute, role) =>
   User.findOne({ _id: id, institute, role });
 
-export const findStudentById = (studentId) =>
-  User.findById(studentId).select('-password').populate({ path: 'class', select: 'name lecturer', populate: { path: 'lecturer', select: 'fullName' } });
+export const findStudentById = (studentId, instituteId) =>
+  User.findOne({ _id: studentId, institute: instituteId, role: 'student' }).select('-password').populate({ path: 'class', select: 'name lecturer', populate: { path: 'lecturer', select: 'fullName' } });
 
 export const findLecturerById = (lecturerId, instituteId) =>
   User.findOne({ _id: lecturerId, institute: instituteId, role: 'lecturer' }).select('-password');
@@ -83,8 +83,8 @@ export const findClassPopulated = (classId, institute) =>
     .populate('lecturer', 'fullName email role phoneNumber')
     .populate('students', 'fullName email role class studentProfile');
 
-export const findClassWithStudents = (classId) =>
-  Class.findById(classId).populate('students', 'fullName email');
+export const findClassWithStudents = (classId, instituteId) =>
+  Class.findOne({ _id: classId, institute: instituteId }).populate('students', 'fullName email');
 
 export const findClassesPaginated = (filter, skip, limit) =>
   Class.find(filter)
@@ -107,8 +107,8 @@ export const findClassesByLecturer = (lecturerId, instituteId) =>
 
 // ─── Subject ──────────────────────────────────────────────────────────────────
 
-export const findSubjectsByLecturer = (lecturerId) =>
-  Subject.find({ lecturer: lecturerId }).populate('class', 'name');
+export const findSubjectsByLecturer = (lecturerId, instituteId) =>
+  Subject.find({ lecturer: lecturerId, institute: instituteId }).populate('class', 'name');
 
 export const countSubjects = (filter) => Subject.countDocuments(filter);
 
@@ -187,11 +187,11 @@ export const findStudentFeesByClass = (classId, studentIds, instituteId) =>
 export const upsertAttendance = (filter, data) =>
   Attendance.findOneAndUpdate(filter, data, { upsert: true, new: true });
 
-export const countAttendanceByStudent = (studentId) =>
-  Attendance.countDocuments({ 'records.student': studentId });
+export const countAttendanceByStudent = (studentId, instituteId) =>
+  Attendance.countDocuments({ institute: instituteId, 'records.student': studentId });
 
-export const countAttendancePresentByStudent = (studentId) =>
-  Attendance.countDocuments({ records: { $elemMatch: { student: studentId, status: 'present' } } });
+export const countAttendancePresentByStudent = (studentId, instituteId) =>
+  Attendance.countDocuments({ institute: instituteId, records: { $elemMatch: { student: studentId, status: 'present' } } });
 
 export const findAttendanceForReportCard = (instituteId) =>
   Attendance.find({ institute: instituteId }).lean();

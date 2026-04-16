@@ -117,7 +117,7 @@ export const getClassById = async (req, res, next) => {
 
 export const getClassWithStudents = async (req, res, next) => {
   try {
-    const data = await adminService.getClassWithStudents(req.params.classId);
+    const data = await adminService.getClassWithStudents(req.params.classId, req.user);
     res.json(data);
   } catch (err) {
     next(err);
@@ -135,7 +135,7 @@ export const getAllClasses = async (req, res, next) => {
 
 export const getStudentsByClass = async (req, res, next) => {
   try {
-    const data = await adminService.getStudentsByClass();
+    const data = await adminService.getStudentsByClass(req.user);
     res.json(data);
   } catch (err) {
     next(err);
@@ -144,7 +144,7 @@ export const getStudentsByClass = async (req, res, next) => {
 
 export const getLecturerClasses = async (req, res, next) => {
   try {
-    const data = await adminService.getLecturerClasses(req.params.lecturerId);
+    const data = await adminService.getLecturerClasses(req.params.lecturerId, req.user);
     res.json(data);
   } catch (err) {
     next(err);
@@ -153,7 +153,7 @@ export const getLecturerClasses = async (req, res, next) => {
 
 export const getStudentClasses = async (req, res, next) => {
   try {
-    const result = await adminService.getStudentClasses(req.params.studentId);
+    const result = await adminService.getStudentClasses(req.params.studentId, req.user);
     res.json(result);
   } catch (err) {
     next(err);
@@ -229,7 +229,7 @@ export const markAttendance = async (req, res, next) => {
 
 export const attendanceSummary = async (req, res, next) => {
   try {
-    const result = await adminService.attendanceSummary(req.params.studentId);
+    const result = await adminService.attendanceSummary(req.params.studentId, req.user);
     res.json(result);
   } catch (err) {
     next(err);

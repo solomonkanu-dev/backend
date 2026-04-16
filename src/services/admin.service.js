@@ -323,7 +323,10 @@ export const getClassById = async (classId, user) => {
   return { class: classDoc, totalStudents, totalMales, totalFemales };
 };
 
-export const getClassWithStudents = (classId) => repo.findClassWithStudents(classId);
+export const getClassWithStudents = (classId, user) => {
+  const instituteId = user.institute?._id || user.institute;
+  return repo.findClassWithStudents(classId, instituteId);
+};
 
 export const getAllClasses = async (query, user) => {
   const page = parseInt(query.page) || 1;
@@ -352,15 +355,21 @@ export const getAllClasses = async (query, user) => {
   return { data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
 };
 
-export const getStudentsByClass = () =>
-  repo.findUsersPaginated({ role: 'student' }, 0, 1000);
+export const getStudentsByClass = (user) => {
+  const instituteId = user.institute?._id || user.institute;
+  return repo.findUsersPaginated({ role: 'student', institute: instituteId }, 0, 1000);
+};
 
-export const getLecturerClasses = (lecturerId) =>
-  repo.findSubjectsByLecturer(lecturerId);
+export const getLecturerClasses = (lecturerId, user) => {
+  const instituteId = user.institute?._id || user.institute;
+  return repo.findSubjectsByLecturer(lecturerId, instituteId);
+};
 
-export const getStudentClasses = async (studentId) => {
-  const student = await repo.findStudentById(studentId);
-  const subjects = await repo.findSubjectsByLecturer(student.class._id);
+export const getStudentClasses = async (studentId, user) => {
+  const instituteId = user.institute?._id || user.institute;
+  const student = await repo.findStudentById(studentId, instituteId);
+  if (!student) throw new AppError('Student not found', 404);
+  const subjects = await repo.findSubjectsByLecturer(student.class._id, instituteId);
   return { class: student.class, subjects };
 };
 
@@ -477,10 +486,11 @@ export const markAttendance = ({ classId, date, records }, user) => {
   );
 };
 
-export const attendanceSummary = async (studentId) => {
+export const attendanceSummary = async (studentId, user) => {
+  const instituteId = user.institute?._id || user.institute;
   const [total, present] = await Promise.all([
-    repo.countAttendanceByStudent(studentId),
-    repo.countAttendancePresentByStudent(studentId),
+    repo.countAttendanceByStudent(studentId, instituteId),
+    repo.countAttendancePresentByStudent(studentId, instituteId),
   ]);
   const percentage = total === 0 ? 0 : ((present / total) * 100).toFixed(2);
   return { total, present, percentage };
