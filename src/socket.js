@@ -6,6 +6,7 @@ import { addUser, removeUser, getOnlineSnapshot } from "./presence.js";
 
 let io;
 
+// Broadcast latest snapshot to all connected super admins
 function broadcastPresence() {
   if (!io) return;
   io.to("room:super_admin").emit("presence:update", getOnlineSnapshot());
@@ -22,7 +23,7 @@ export function initSocket(server) {
     connectionStateRecovery: {},
   });
 
-  // Auth middleware — same lean query as before, no populate (avoids issues with missing ref)
+  // Auth middleware — verifies JWT from handshake.auth.token
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -43,22 +44,25 @@ export function initSocket(server) {
   io.on("connection", async (socket) => {
     const { _id, role, fullName, institute: instituteId } = socket.user;
 
-    // Each user joins their personal notification room
+    // Join personal notification room
     socket.join(`user:${_id}`);
 
     // Super admins join a dedicated room to receive presence broadcasts
     if (role === "super_admin") {
       socket.join("room:super_admin");
+      // Push current snapshot directly to this socket immediately (avoids race condition
+      // where broadcastPresence fires before the client-side listener is attached)
+      socket.emit("presence:update", getOnlineSnapshot());
     }
 
-    // For admins, fetch the institute name so it shows in the super-admin table
+    // For admins, fetch the institute name for the super-admin detail table
     let instituteData = null;
     if (role === "admin" && instituteId) {
       try {
         const inst = await Institute.findById(instituteId).select("name").lean();
         if (inst) instituteData = { _id: String(inst._id), name: inst.name };
       } catch {
-        // non-critical — continue without institute name
+        // non-critical — track admin without institute name
       }
     }
 
@@ -69,9 +73,18 @@ export function initSocket(server) {
       institute:   instituteData,
       connectedAt: new Date(),
     });
+
+    // Notify all online super admins that a user joined
     broadcastPresence();
 
-    // Join a conversation room (for typing indicators)
+    // Super admin can request the latest snapshot at any time
+    socket.on("request_presence", () => {
+      if (socket.user.role === "super_admin") {
+        socket.emit("presence:update", getOnlineSnapshot());
+      }
+    });
+
+    // Conversation rooms (typing indicators)
     socket.on("join_conversation", (conversationId) => {
       if (conversationId) socket.join(`conv:${conversationId}`);
     });
@@ -80,7 +93,6 @@ export function initSocket(server) {
       if (conversationId) socket.leave(`conv:${conversationId}`);
     });
 
-    // Typing indicators
     socket.on("typing_start", ({ conversationId }) => {
       if (!conversationId) return;
       socket.to(`conv:${conversationId}`).emit("typing", {
