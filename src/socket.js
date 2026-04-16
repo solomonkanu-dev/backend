@@ -1,44 +1,13 @@
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import User from "./models/user.js";
+import { addUser, removeUser, getOnlineSnapshot } from "./presence.js";
 
 let io;
 
-// socketId → { userId, role, fullName, institute: { _id, name }, connectedAt }
-const onlineUsers = new Map();
-
-function buildSnapshot() {
-  const counts = { student: 0, lecturer: 0, parent: 0, admin: 0 };
-  const admins = [];
-
-  for (const entry of onlineUsers.values()) {
-    const role = entry.role;
-    if (role === "student")       counts.student++;
-    else if (role === "lecturer") counts.lecturer++;
-    else if (role === "parent")   counts.parent++;
-    else if (role === "admin")    counts.admin++;
-    // super_admin not counted in role buckets
-
-    if (role === "admin") {
-      admins.push({
-        userId:      String(entry.userId),
-        fullName:    entry.fullName,
-        institute:   entry.institute,
-        connectedAt: entry.connectedAt,
-      });
-    }
-  }
-
-  return { counts, admins };
-}
-
 function broadcastPresence() {
   if (!io) return;
-  io.to("room:super_admin").emit("presence:update", buildSnapshot());
-}
-
-export function getOnlineSnapshot() {
-  return buildSnapshot();
+  io.to("room:super_admin").emit("presence:update", getOnlineSnapshot());
 }
 
 export function initSocket(server) {
@@ -75,13 +44,13 @@ export function initSocket(server) {
     // Each user joins their personal notification room
     socket.join(`user:${_id}`);
 
-    // Super admins join a dedicated room so they receive presence broadcasts
+    // Super admins join a dedicated room to receive presence broadcasts
     if (role === "super_admin") {
       socket.join("room:super_admin");
     }
 
     // Track presence
-    onlineUsers.set(socket.id, {
+    addUser(socket.id, {
       userId:      _id,
       role,
       fullName,
@@ -120,7 +89,7 @@ export function initSocket(server) {
     });
 
     socket.on("disconnect", () => {
-      onlineUsers.delete(socket.id);
+      removeUser(socket.id);
       broadcastPresence();
     });
   });
