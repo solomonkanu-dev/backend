@@ -13,7 +13,9 @@ function broadcastPresence() {
 export function initSocket(server) {
   io = new Server(server, {
     cors: {
-      origin: process.env.ALLOWED_ORIGINS?.split(",") || [],
+      origin: process.env.ALLOWED_ORIGINS
+        ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim().replace(/\/$/, ""))
+        : [],
       credentials: true,
     },
     connectionStateRecovery: {},
