@@ -9,7 +9,10 @@ let io;
 // Broadcast latest snapshot to all connected super admins
 function broadcastPresence() {
   if (!io) return;
-  io.to("room:super_admin").emit("presence:update", getOnlineSnapshot());
+  const snap = getOnlineSnapshot();
+  const roomSize = io.sockets.adapter.rooms.get("room:super_admin")?.size ?? 0;
+  console.log(`[socket] broadcastPresence → ${roomSize} super_admin socket(s), students=${snap.counts.student} lecturers=${snap.counts.lecturer} admins=${snap.counts.admin}`);
+  io.to("room:super_admin").emit("presence:update", snap);
 }
 
 export function initSocket(server) {
