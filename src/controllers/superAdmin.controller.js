@@ -200,3 +200,21 @@ export const getOnlineUsers = (req, res, next) => {
     next(err);
   }
 };
+
+export const getOnlineReports = async (req, res, next) => {
+  try {
+    const result = await superAdminService.getOnlineReports(req.query);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getOnlineReport = async (req, res, next) => {
+  try {
+    const data = await superAdminService.getOnlineReport(req.params.reportId);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};

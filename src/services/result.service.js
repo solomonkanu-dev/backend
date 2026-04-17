@@ -4,8 +4,11 @@ import * as resultRepo from '../repositories/result.repository.js';
 import User from '../models/user.js';
 import Subject from '../models/Subject.js';
 import AcademicTerm from '../models/AcademicTerm.js';
+import Result from '../models/Result.js';
 import { logAudit } from '../utils/audit.js';
 import { sendEmailNotification } from '../utils/email.js';
+
+const getInstituteId = (user) => user.institute?._id || user.institute;
 
 export const assignMarks = async (body, req) => {
   const { user } = req;
@@ -77,4 +80,43 @@ export const assignMarks = async (body, req) => {
   }).catch(() => {});
 
   return result;
+};
+
+export const publishResults = async (classId, termId, req) => {
+  const instituteId = getInstituteId(req.user);
+  const { matchedCount, modifiedCount } = await Result.updateMany(
+    { class: classId, term: termId, institute: instituteId },
+    { $set: { isPublished: true } }
+  );
+  logAudit(req, {
+    action: 'PUBLISH_RESULTS',
+    entity: 'Result',
+    description: `Published ${modifiedCount} result(s) for class ${classId} term ${termId}`,
+    statusCode: 200,
+  });
+  return { matched: matchedCount, modified: modifiedCount };
+};
+
+export const unpublishResults = async (classId, termId, req) => {
+  const instituteId = getInstituteId(req.user);
+  const { matchedCount, modifiedCount } = await Result.updateMany(
+    { class: classId, term: termId, institute: instituteId },
+    { $set: { isPublished: false } }
+  );
+  logAudit(req, {
+    action: 'UNPUBLISH_RESULTS',
+    entity: 'Result',
+    description: `Unpublished ${modifiedCount} result(s) for class ${classId} term ${termId}`,
+    statusCode: 200,
+  });
+  return { matched: matchedCount, modified: modifiedCount };
+};
+
+export const getPublishStatus = async (classId, termId, req) => {
+  const instituteId = getInstituteId(req.user);
+  const [total, published] = await Promise.all([
+    Result.countDocuments({ class: classId, term: termId, institute: instituteId }),
+    Result.countDocuments({ class: classId, term: termId, institute: instituteId, isPublished: true }),
+  ]);
+  return { total, published, unpublished: total - published };
 };

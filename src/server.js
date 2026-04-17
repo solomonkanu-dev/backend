@@ -6,6 +6,7 @@ import logger from './utils/logger.js';
 import seedPlans from './config/seedPlans.js';
 import { migrateIndexes } from './config/migrateIndexes.js';
 import { startAutoFinalizeJob } from './jobs/autoFinalizeAttendance.js';
+import { startSnapshotCaptureJob } from './jobs/captureOnlineSnapshot.js';
 import { backfillQRTokens } from './services/qrAttendance.service.js';
 import { initSocket } from './socket.js';
 
@@ -39,6 +40,7 @@ const PORT = process.env.PORT || 8080;
 
     // Start background jobs and one-time migrations (DB is now connected)
     startAutoFinalizeJob();
+    startSnapshotCaptureJob();
     backfillQRTokens();
 
     const server = createServer(app);

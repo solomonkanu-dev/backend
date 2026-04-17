@@ -9,6 +9,7 @@ import Subject from '../models/Subject.js';
 import { AppError } from '../errors/AppError.js';
 import { logAudit } from '../utils/audit.js';
 import { notify } from '../utils/notify.js';
+import OnlineUserReport from '../models/OnlineUserReport.js';
 
 export const superAdminLogin = async ({ email, password }) => {
   const user = await repo.findUserByEmail(email, 'super_admin');
@@ -277,4 +278,37 @@ export const getInstituteById = async (id) => {
   const institute = await repo.findInstituteById(id);
   if (!institute) throw new AppError('Institute not found', 404);
   return institute;
+};
+
+export const getOnlineReports = async ({ page = 1, limit = 10 } = {}) => {
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const lim = Math.min(parseInt(limit) || 10, 50);
+  const skip = (pageNum - 1) * lim;
+
+  const [data, total] = await Promise.all([
+    OnlineUserReport.find({})
+      .sort({ weekStart: -1 })
+      .skip(skip)
+      .limit(lim)
+      .select('-days._runningSum')
+      .lean(),
+    OnlineUserReport.countDocuments(),
+  ]);
+
+  return {
+    data,
+    pagination: { page: pageNum, limit: lim, total, pages: Math.ceil(total / lim) },
+  };
+};
+
+export const getOnlineReport = async (reportId) => {
+  if (!mongoose.Types.ObjectId.isValid(reportId))
+    throw new AppError('Invalid report ID', 400);
+
+  const report = await OnlineUserReport.findById(reportId)
+    .select('-days._runningSum')
+    .lean();
+
+  if (!report) throw new AppError('Report not found', 404);
+  return report;
 };

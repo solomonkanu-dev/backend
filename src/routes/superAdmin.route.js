@@ -20,6 +20,8 @@ import {
   getAdminOnboardingList,
   getAdminOnboardingDetail,
   getOnlineUsers,
+  getOnlineReports,
+  getOnlineReport,
 } from '../controllers/superAdmin.controller.js';
 import auth from '../middlewares/auth.js';
 import superAdminOnly from '../middlewares/superAdmin.js';
@@ -82,6 +84,19 @@ router.patch('/onboarding/:adminId/reject', auth, superAdminOnly, rejectAdminOnb
 
 // System-wide monitoring
 router.get('/monitor/online-users', auth, superAdminOnly, getOnlineUsers);
+router.get('/monitor/online-reports', auth, superAdminOnly, getOnlineReports);
+router.get(
+  '/monitor/online-reports/:reportId',
+  auth,
+  superAdminOnly,
+  [param('reportId').isMongoId().withMessage('Invalid report ID')],
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty())
+      return res.status(400).json({ errors: errors.array() });
+    getOnlineReport(req, res, next);
+  }
+);
 router.get('/monitor/overview', auth, superAdminOnly, getSystemOverview);
 router.get('/monitor/institutes', auth, superAdminOnly, getInstituteHealthReport);
 router.get('/monitor/institutes/:instituteId', auth, superAdminOnly, getInstituteDeepReport);

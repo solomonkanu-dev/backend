@@ -1,4 +1,5 @@
 import * as adminService from '../services/admin.service.js';
+import { publishResults as publishResultsSvc, unpublishResults as unpublishResultsSvc, getPublishStatus } from '../services/result.service.js';
 
 export const requestAdminSignup = async (req, res, next) => {
   try {
@@ -182,6 +183,36 @@ export const getResultsBySubject = async (req, res, next) => {
   try {
     const data = await adminService.getResultsBySubject(req.params.subjectId, req.user);
     res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const publishResults = async (req, res, next) => {
+  try {
+    const { classId, termId } = req.body;
+    const data = await publishResultsSvc(classId, termId, req);
+    res.json({ success: true, message: 'Results published successfully', data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const unpublishResults = async (req, res, next) => {
+  try {
+    const { classId, termId } = req.body;
+    const data = await unpublishResultsSvc(classId, termId, req);
+    res.json({ success: true, message: 'Results unpublished successfully', data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getResultPublishStatus = async (req, res, next) => {
+  try {
+    const { classId, termId } = req.query;
+    const data = await getPublishStatus(classId, termId, req);
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }

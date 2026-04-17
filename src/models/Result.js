@@ -17,6 +17,7 @@ const resultSchema = new mongoose.Schema(
       required: true,
     },
     term: { type: mongoose.Schema.Types.ObjectId, ref: "AcademicTerm", default: null },
+    isPublished: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

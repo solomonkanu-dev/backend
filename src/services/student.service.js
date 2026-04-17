@@ -20,14 +20,14 @@ export const getMyFees = (user) => {
 
 export const getMyResults = (user, termId) => {
   const classId = user.class;
-  const filter = { student: user._id, institute: user.institute };
+  const filter = { student: user._id, institute: user.institute, isPublished: true };
   if (classId) filter.class = classId;
   if (termId) filter.term = termId;
   return repo.findMyResults(filter);
 };
 
 export const getMyResultsByClass = (classId, user, termId) => {
-  const filter = { student: user._id, institute: user.institute };
+  const filter = { student: user._id, institute: user.institute, isPublished: true };
   if (classId) filter.class = classId;
   if (termId) filter.term = termId;
   return repo.findMyResults(filter);

@@ -54,6 +54,7 @@ import { recordPayment, getStudentPayments, getPaymentReceipt } from "../control
 import { createOrUpdateTimetable, updateTimetable, deleteTimetable } from "../controllers/timetable.controller.js";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "../controllers/calendar.controller.js";
 import { getStudentQR, toggleStudentQR } from "../controllers/qr.attendance.controller.js";
+import { publishResults, unpublishResults, getResultPublishStatus } from "../controllers/admin.controller.js";
 
 const router = Router();
 
@@ -136,6 +137,9 @@ router.get("/students/:studentId/assignments", auth, adminOnly, getStudentAssign
 router.get("/assignments", auth, adminOnly, getAllAssignments);
 router.get("/results/class/:classId", auth, adminOnly, getResultsByClass);
 router.get("/results/subject/:subjectId", auth, adminOnly, getResultsBySubject);
+router.get("/results/publish-status", auth, adminOnly, getResultPublishStatus);
+router.patch("/results/publish", auth, adminOnly, publishResults);
+router.patch("/results/unpublish", auth, adminOnly, unpublishResults);
 router.get("/my-institute", auth, adminOnly, getMyInstitute);
 router.put("/my-institute/update", auth, adminOnly, updateInstitute);
 router.post("/fees/assign/class", auth, adminOnly, assignFeesToClass);

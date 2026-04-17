@@ -51,7 +51,7 @@ export const getChildResults = async (studentId, classId, user) => {
     resolvedClassId = student?.class;
   }
 
-  const filter = { student: studentId };
+  const filter = { student: studentId, isPublished: true };
   if (resolvedClassId) filter.class = resolvedClassId;
 
   const results = await repo.findResultsForStudent(filter);

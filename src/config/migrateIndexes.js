@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import logger from '../utils/logger.js';
+import Result from '../models/Result.js';
 
 /**
  * Drop stale indexes that have been superseded by schema changes.
@@ -30,6 +31,16 @@ export async function migrateIndexes() {
     );
     if (assignmentResult.modifiedCount > 0) {
       logger.info(`Backfilled status=published on ${assignmentResult.modifiedCount} assignment(s)`);
+    }
+
+    // Backfill results that were created before isPublished was added.
+    // Mark them all published so existing student results remain visible.
+    const resultMigration = await Result.updateMany(
+      { isPublished: { $exists: false } },
+      { $set: { isPublished: true } }
+    );
+    if (resultMigration.modifiedCount > 0) {
+      logger.info(`Backfilled isPublished=true on ${resultMigration.modifiedCount} existing result(s)`);
     }
   } catch (err) {
     logger.warn('migrateIndexes failed (non-fatal):', err.message);

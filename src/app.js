@@ -39,6 +39,7 @@ import parentRoutes from "./routes/parent.route.js";
 import timetableRoutes from "./routes/timetable.route.js";
 import calendarRoutes from "./routes/calendar.route.js";
 import chatRoutes from "./routes/chat.route.js";
+import examRoutes from "./routes/exam.route.js";
 import { maintenanceCheck } from "./middlewares/maintenanceCheck.js";
 
 const app = express();
@@ -145,6 +146,7 @@ app.use("/api/v1/parent", parentRoutes);
 app.use("/api/v1/timetable", timetableRoutes);
 app.use("/api/v1/calendar", calendarRoutes);
 app.use("/api/v1/chat", chatRoutes);
+app.use("/api/v1/exam", examRoutes);
 
 // Error handler (last)
 app.use(errorHandler);
