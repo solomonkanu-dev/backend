@@ -34,13 +34,13 @@ export async function migrateIndexes() {
     }
 
     // Backfill results that were created before isPublished was added.
-    // Mark them all published so existing student results remain visible.
+    // Default them to unpublished — admin must explicitly publish per class/term.
     const resultMigration = await Result.updateMany(
       { isPublished: { $exists: false } },
-      { $set: { isPublished: true } }
+      { $set: { isPublished: false } }
     );
     if (resultMigration.modifiedCount > 0) {
-      logger.info(`Backfilled isPublished=true on ${resultMigration.modifiedCount} existing result(s)`);
+      logger.info(`Backfilled isPublished=false on ${resultMigration.modifiedCount} existing result(s)`);
     }
   } catch (err) {
     logger.warn('migrateIndexes failed (non-fatal):', err.message);

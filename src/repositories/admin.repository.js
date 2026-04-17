@@ -145,11 +145,14 @@ export const findResultsBySubject = (subjectId, instituteId) =>
     .populate('student', 'fullName email')
     .populate('subject', 'name totalMarks');
 
-export const findResultsByStudentAndInstitute = (studentId, instituteId) =>
-  Result.find({ student: studentId, institute: instituteId })
+export const findResultsByStudentAndInstitute = (studentId, instituteId, termId) => {
+  const filter = { student: studentId, institute: instituteId };
+  if (termId) filter.term = termId;
+  return Result.find(filter)
     .populate('subject', 'name code totalMarks')
     .populate('term', 'name academicYear')
     .lean();
+};
 
 export const findResultsForRanking = (classId, instituteId, termId) => {
   const filter = { class: classId, institute: instituteId };

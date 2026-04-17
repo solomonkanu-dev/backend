@@ -409,7 +409,7 @@ export const getClassRankings = async (classId, user, termId) => {
   return { rankings: ranked, total: ranked.length };
 };
 
-export const getReportCard = async (studentId, user) => {
+export const getReportCard = async (studentId, user, termId) => {
   const student = await repo.findUserOne({ _id: studentId, institute: user.institute, role: 'student' });
   if (!student) throw new AppError('Student not found', 404);
 
@@ -419,7 +419,7 @@ export const getReportCard = async (studentId, user) => {
   const [institute, terms, results, attendanceRecords] = await Promise.all([
     repo.findInstituteById(user.institute),
     repo.findTermsByInstitute(user.institute),
-    repo.findResultsByStudentAndInstitute(studentId, user.institute),
+    repo.findResultsByStudentAndInstitute(studentId, user.institute, termId),
     repo.findAttendanceForReportCard(user.institute),
   ]);
 

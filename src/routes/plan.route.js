@@ -6,6 +6,7 @@ import {
 } from '../controllers/plan.controller.js';
 import auth from '../middlewares/auth.js';
 import superAdminOnly from '../middlewares/superAdmin.js';
+import { adminOnly } from '../middlewares/adminOnly.js';
 
 const router = Router();
 
@@ -13,8 +14,8 @@ const router = Router();
 router.post('/webhook', handleWebhook);
 
 // Admin self-service payment
-router.post('/checkout', auth, createCheckout);
-router.get('/verify/:sessionId', auth, verifyPayment);
+router.post('/checkout', auth, adminOnly, createCheckout);
+router.get('/verify/:sessionId', auth, adminOnly, verifyPayment);
 
 // Accessible to any authenticated user (for plan selection page)
 router.get('/available', auth, getAvailablePlans);

@@ -318,7 +318,7 @@ export const getClassRankings = async (req, res, next) => {
 
 export const getReportCard = async (req, res, next) => {
   try {
-    const data = await adminService.getReportCard(req.params.studentId, req.user);
+    const data = await adminService.getReportCard(req.params.studentId, req.user, req.query.termId);
     res.json(data);
   } catch (err) {
     next(err);

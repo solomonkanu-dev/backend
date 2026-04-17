@@ -119,14 +119,18 @@ export const verifyAndActivatePlan = async (sessionId, user) => {
     subscription: { assignedAt: new Date(), assignedBy: user._id },
   });
 
-  notify({
-    recipientId: user._id,
-    instituteId,
-    type: 'plan_assigned',
-    title: 'Plan Activated',
-    message: `Your ${plan.displayName || plan.name} plan is now active. Expires ${planExpiry.toDateString()}.`,
-    relatedEntity: { entityType: 'Institute', entityId: instituteId },
-  });
+  // Always notify the admin of the institute, not the calling user
+  const admin = await User.findOne({ institute: instituteId, role: 'admin' }, '_id');
+  if (admin) {
+    notify({
+      recipientId: admin._id,
+      instituteId,
+      type: 'plan_assigned',
+      title: 'Plan Activated',
+      message: `Your ${plan.displayName || plan.name} plan is now active. Expires ${planExpiry.toDateString()}.`,
+      relatedEntity: { entityType: 'Institute', entityId: instituteId },
+    });
+  }
 
   return { plan, planExpiry, institute };
 };
