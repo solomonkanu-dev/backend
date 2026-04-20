@@ -103,9 +103,8 @@ export const publishResults = async (classId, termId, req) => {
   logAudit(req, {
     action: 'PUBLISH_RESULTS',
     entity: 'Result',
-    description: `Published ${modifiedCount} result(s) for class ${cls?.name ?? classId} term ${term?.name ?? termId}`,
-    before: { isPublished: false },
-    after:  { isPublished: true, count: modifiedCount },
+    description: `Published ${modifiedCount} of ${matchedCount} result(s) for class ${cls?.name ?? classId} term ${term?.name ?? termId}`,
+    after: { isPublished: true, count: modifiedCount, matchedCount },
     statusCode: 200,
   });
   return { matched: matchedCount, modified: modifiedCount };

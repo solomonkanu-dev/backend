@@ -14,6 +14,8 @@ export const getStructuresForStudent = async (studentId) => {
 };
 
 export const assignFeeToStudent = async ({ studentId, selectedParticulars }) => {
+  if (!mongoose.Types.ObjectId.isValid(studentId)) throw new AppError('Invalid student ID', 400);
+
   const student = await User.findById(studentId);
   if (!student) throw new AppError('Student not found', 404);
   if (!student.class) throw new AppError('Student has no class assigned. Please assign the student to a class first.', 400);
@@ -24,20 +26,37 @@ export const assignFeeToStudent = async ({ studentId, selectedParticulars }) => 
   const existing = await repo.findOneStudentFee(studentId, instituteId);
 
   if (Array.isArray(selectedParticulars) && selectedParticulars.length > 0) {
-    // Manual particulars — always append (no structure-level dedup possible)
-    const fees = selectedParticulars.map((p) => ({ label: p.label, amount: Number(p.amount), paid: 0 }));
-    const addedAmount = fees.reduce((sum, f) => sum + f.amount, 0);
+    // Manual particulars — validate and sanitize entries before persisting
+    const validatedFees = selectedParticulars
+      .map((p) => {
+        // Validate label: must be a non-empty string
+        const label = typeof p.label === 'string' ? p.label.trim() : '';
+        if (!label) return null; // Skip entries with empty/missing labels
+
+        // Validate amount: parse and ensure it's a finite number
+        const amount = parseFloat(p.amount);
+        if (!isFinite(amount) || amount < 0) return null; // Skip invalid amounts; treat as 0 per business rule
+
+        return { label, amount, paid: 0 };
+      })
+      .filter((f) => f !== null); // Remove invalid entries
+
+    if (validatedFees.length === 0) {
+      throw new AppError('No valid fee particulars provided', 400);
+    }
+
+    const addedAmount = validatedFees.reduce((sum, f) => sum + f.amount, 0);
 
     if (existing) {
       return repo.updateStudentFeeById(existing._id, {
-        $push: { fees: { $each: fees } },
+        $push: { fees: { $each: validatedFees } },
         $inc: { totalAmount: addedAmount, balance: addedAmount },
       });
     }
 
     return repo.createStudentFee({
       student: studentId, class: classId, institute: instituteId,
-      fees, feeStructures: [], totalAmount: addedAmount, balance: addedAmount,
+      fees: validatedFees, feeStructures: [], totalAmount: addedAmount, balance: addedAmount,
     });
   }
 
@@ -59,7 +78,9 @@ export const assignFeeToStudent = async ({ studentId, selectedParticulars }) => 
 
   if (existing) {
     return repo.updateStudentFeeById(existing._id, {
-      $push: { fees: { $each: newFees }, feeStructures: { $each: newStructureIds } },
+      // $push: { fees: { $each: newFees }, feeStructures: { $each: newStructureIds } },
+      $push: { fees: { $each: newFees } },
+      $addToSet: { feeStructures: { $each: newStructureIds } },
       $inc: { totalAmount: addedAmount, balance: addedAmount },
     });
   }

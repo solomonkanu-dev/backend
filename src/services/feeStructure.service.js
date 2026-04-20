@@ -48,8 +48,8 @@ export const getFeeStructures = async (query, user) => {
   if (studentId) q.studentId = studentId;
   if (instituteId) q.instituteId = instituteId;
   else if (user?.institute) {
-    q.instituteId = user.institute;
     instituteId = user.institute?._id || user.institute;
+    q.instituteId = instituteId;
   }
 
   const pageNum = Math.max(1, parseInt(page, 10) || 1);

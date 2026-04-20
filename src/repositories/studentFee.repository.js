@@ -14,7 +14,10 @@ export const findStructuresForStudent = (instituteId, classId, studentId) =>
 export const findOneStudentFee = (studentId, instituteId) =>
   StudentFee.findOne({ student: studentId, institute: instituteId });
 
-export const createStudentFee = (data) => StudentFee.create(data);
+export const createStudentFee = (data, session = null) => {
+  const createOpts = session ? { session } : {};
+  return StudentFee.create([data], createOpts).then(docs => docs[0]);
+};
 
 export const findStudentsWithFees = (instituteId) =>
   StudentFee.find({ institute: instituteId })
@@ -30,5 +33,7 @@ export const findFeesForStudent = (studentId, instituteId) =>
 export const findStudentFeesByFilter = (filter) =>
   StudentFee.find(filter).populate('class', 'name').lean();
 
-export const updateStudentFeeById = (id, update) =>
-  StudentFee.findByIdAndUpdate(id, update, { new: true });
+export const updateStudentFeeById = (id, update, session = null) => {
+  const opts = { new: true, ...(session ? { session } : {}) };
+  return StudentFee.findByIdAndUpdate(id, update, opts);
+};

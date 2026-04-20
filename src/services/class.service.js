@@ -5,12 +5,15 @@ export const createClass = async (body, user) => {
   if (user.role !== 'admin') throw new AppError('Access denied', 403);
 
   const { name, lecturerId } = body;
-  if (!name || !lecturerId) throw new AppError('All fields are required', 400);
+  
+  // Validate that name is not empty or whitespace-only
+  const trimmedName = name && name.trim();
+  if (!trimmedName || !lecturerId) throw new AppError('All fields are required', 400);
 
   const lecturer = await classRepo.findLecturer(lecturerId, user.institute);
   if (!lecturer) throw new AppError('Lecturer not found', 404);
 
-  return classRepo.create({ name, lecturer: lecturer._id, institute: user.institute });
+  return classRepo.create({ name: trimmedName, lecturer: lecturer._id, institute: user.institute });
 };
 
 export const addStudentToClass = async (body, user) => {
@@ -59,7 +62,14 @@ export const updateClass = async (classId, { name, lecturerId }, user) => {
   const singleClass = await classRepo.findOne({ _id: classId, institute: instituteId });
   if (!singleClass) throw new AppError('Class not found', 404);
 
-  if (name) singleClass.name = name.trim();
+  // Validate and trim class name: reject whitespace-only or empty strings
+  if (name) {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      throw new AppError('Class name cannot be empty or whitespace-only', 400);
+    }
+    singleClass.name = trimmedName;
+  }
 
   if (lecturerId) {
     const lecturer = await classRepo.findLecturer(lecturerId, instituteId);

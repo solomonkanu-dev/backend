@@ -27,49 +27,86 @@ export const assignFeesToClass = async ({ classId, fees }, user) => {
 
   let assigned = 0;
   let skipped = 0;
+  const failedStudents = [];
 
-  for (const student of students) {
-    const existing = existingByStudent.get(student._id.toString());
+  // Start a MongoDB session for transaction support
+  const session = await mongoose.startSession();
 
-    if (!existing) {
-      // No fee record yet — create with all selected structures
-      const feeParticulars = structures.flatMap((s) =>
-        s.particulars.map((p) => ({ label: p.label, amount: p.amount, paid: 0 }))
-      );
-      const totalAmount = feeParticulars.reduce((sum, f) => sum + f.amount, 0);
+  try {
+    // Wrap the entire student loop in a transaction
+    await session.withTransaction(async () => {
+      for (const student of students) {
+        try {
+          const existing = existingByStudent.get(student._id.toString());
 
-      await studentFeeRepo.createStudentFee({
-        student: student._id,
-        class: classId,
-        institute: instituteId,
-        fees: feeParticulars,
-        feeStructures: structures.map((s) => s._id),
-        totalAmount,
-        balance: totalAmount,
-      });
-      assigned++;
-      continue;
-    }
+          if (!existing) {
+            // No fee record yet — create with all selected structures
+            const feeParticulars = structures.flatMap((s) =>
+              s.particulars.map((p) => ({ label: p.label, amount: p.amount, paid: 0 }))
+            );
+            const totalAmount = feeParticulars.reduce((sum, f) => sum + f.amount, 0);
 
-    // Student already has a fee record — only add structures not yet assigned
-    const alreadyAssigned = new Set((existing.feeStructures ?? []).map((id) => id.toString()));
-    const newStructures = structures.filter((s) => !alreadyAssigned.has(s._id.toString()));
+            await studentFeeRepo.createStudentFee(
+              {
+                student: student._id,
+                class: classId,
+                institute: instituteId,
+                fees: feeParticulars,
+                feeStructures: structures.map((s) => s._id),
+                totalAmount,
+                balance: totalAmount,
+              },
+              session
+            );
+            assigned++;
+            continue;
+          }
 
-    if (newStructures.length === 0) {
-      skipped++;
-      continue;
-    }
+          // Student already has a fee record — only add structures not yet assigned
+          const alreadyAssigned = new Set((existing.feeStructures ?? []).map((id) => id.toString()));
+          const newStructures = structures.filter((s) => !alreadyAssigned.has(s._id.toString()));
 
-    const newFees = newStructures.flatMap((s) =>
-      s.particulars.map((p) => ({ label: p.label, amount: p.amount, paid: 0 }))
-    );
-    const addedAmount = newFees.reduce((sum, f) => sum + f.amount, 0);
+          if (newStructures.length === 0) {
+            skipped++;
+            continue;
+          }
 
-    await studentFeeRepo.updateStudentFeeById(existing._id, {
-      $push: { fees: { $each: newFees }, feeStructures: { $each: newStructures.map((s) => s._id) } },
-      $inc: { totalAmount: addedAmount, balance: addedAmount },
+          const newFees = newStructures.flatMap((s) =>
+            s.particulars.map((p) => ({ label: p.label, amount: p.amount, paid: 0 }))
+          );
+          const addedAmount = newFees.reduce((sum, f) => sum + f.amount, 0);
+
+          await studentFeeRepo.updateStudentFeeById(
+            existing._id,
+            {
+              $push: { fees: { $each: newFees }, feeStructures: { $each: newStructures.map((s) => s._id) } },
+              $inc: { totalAmount: addedAmount, balance: addedAmount },
+            },
+            session
+          );
+          assigned++;
+        } catch (error) {
+          // Collect failed student details for potential retries
+          failedStudents.push({
+            studentId: student._id,
+            error: error.message,
+          });
+          // Re-throw to trigger transaction rollback
+          throw error;
+        }
+      }
     });
-    assigned++;
+  } finally {
+    await session.endSession();
+  }
+
+  // If there were failures, throw with details
+  if (failedStudents.length > 0) {
+    throw new AppError(
+      `Failed to assign fees to ${failedStudents.length} student(s). Transaction rolled back.`,
+      400,
+      { failedStudents }
+    );
   }
 
   return { assigned, skipped };

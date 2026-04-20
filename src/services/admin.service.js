@@ -85,7 +85,7 @@ export const getAllStudents = async (query, user) => {
 
 export const getStudentById = async (studentId, user) => {
   const instituteId = user.institute?._id ?? user.institute;
-  const student = await repo.findUserOne({ _id: studentId, institute: user.institute, role: 'student' });
+  const student = await repo.findUserOne({ _id: studentId, institute: instituteId, role: 'student' });
   if (!student) throw new AppError('Student not found', 404);
   return repo.findStudentById(studentId, instituteId);
 };
@@ -273,15 +273,18 @@ export const updateLecturer = async (lecturerId, { fullName, email, lecturerProf
 
 // ─── General User Actions ─────────────────────────────────────────────────────
 
+import AppError from '...'; // Add appropriate import path
+
 export const resetPassword = async (userId, password, req) => {
+  const targetUser = await repo.findUserOne({ _id: userId });
+  if (!targetUser) throw new AppError('User not found', 404);
+
   const hashedPassword = await bcrypt.hash(password, 12);
-  const [, targetUser] = await Promise.all([
-    repo.updateUserById(userId, { password: hashedPassword }),
-    repo.findUserOne({ _id: userId }),
-  ]);
+  await repo.updateUserById(userId, { password: hashedPassword });
+
   logAudit(req, {
     action: 'RESET_PASSWORD', entity: 'User', entityId: userId,
-    description: `Reset password for user ${targetUser?.fullName ?? userId}`,
+    description: `Reset password for user ${targetUser.fullName}`,
     after: { passwordReset: true },
     statusCode: 200,
   });

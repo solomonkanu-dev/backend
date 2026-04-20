@@ -38,6 +38,6 @@ router.patch(
   validate,
   assignLecturerToClass
 );
-router.patch("/:classId", auth, adminOnly, updateClass);
+router.patch("/:classId", auth, adminOnly, idParamRule, validate, updateClass);
 
 export default router;
