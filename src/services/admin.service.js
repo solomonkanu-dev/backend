@@ -273,8 +273,6 @@ export const updateLecturer = async (lecturerId, { fullName, email, lecturerProf
 
 // ─── General User Actions ─────────────────────────────────────────────────────
 
-import AppError from '...'; // Add appropriate import path
-
 export const resetPassword = async (userId, password, req) => {
   const targetUser = await repo.findUserOne({ _id: userId });
   if (!targetUser) throw new AppError('User not found', 404);
