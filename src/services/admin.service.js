@@ -84,10 +84,10 @@ export const getAllStudents = async (query, user) => {
 };
 
 export const getStudentById = async (studentId, user) => {
-  const instituteId = user.institute?._id || user.institute;
-  const student = await repo.findUserOne({ _id: studentId, institute: instituteId, role: 'student' });
+  const instituteId = user.institute?._id ?? user.institute;
+  const student = await repo.findUserOne({ _id: studentId, institute: user.institute, role: 'student' });
   if (!student) throw new AppError('Student not found', 404);
-  return repo.findStudentById(studentId);
+  return repo.findStudentById(studentId, instituteId);
 };
 
 export const getStudentAssignments = async (studentId, user) => {
@@ -113,6 +113,8 @@ export const updateStudent = async (studentId, { fullName, email, classId, stude
   const student = await repo.findUserOne({ _id: studentId, institute: instituteId, role: 'student' });
   if (!student) throw new AppError('Student not found', 404);
 
+  const beforeStudent = { fullName: student.fullName, email: student.email, class: student.class?.toString() ?? null };
+
   if (fullName) student.fullName = fullName;
   if (email && email !== student.email) {
     const exists = await repo.findUserForEmailCheck(email, studentId);
@@ -131,7 +133,13 @@ export const updateStudent = async (studentId, { fullName, email, classId, stude
   await student.save();
   const updated = await repo.findUserByIdSelect(studentId);
 
-  logAudit(req, { action: 'UPDATE_STUDENT', entity: 'User', entityId: studentId, description: `Updated student ${student.fullName}`, statusCode: 200 });
+  logAudit(req, {
+    action: 'UPDATE_STUDENT', entity: 'User', entityId: studentId,
+    description: `Updated student ${student.fullName}`,
+    before: beforeStudent,
+    after: { fullName: student.fullName, email: student.email, class: student.class?.toString() ?? null },
+    statusCode: 200,
+  });
   return updated;
 };
 
@@ -142,13 +150,21 @@ export const updateStudentLifecycle = async (studentId, { lifecycleStatus, lifec
   const student = await repo.findUserOne({ _id: studentId, institute: req.user.institute, role: 'student' });
   if (!student) throw new AppError('Student not found', 404);
 
+  const beforeLifecycle = { lifecycleStatus: student.lifecycleStatus, isActive: student.isActive };
+
   student.lifecycleStatus = lifecycleStatus;
   student.lifecycleNote = lifecycleNote ?? '';
   student.lifecycleUpdatedAt = new Date();
   student.isActive = lifecycleStatus === 'active';
   await student.save();
 
-  logAudit(req, { action: 'UPDATE_LIFECYCLE', entity: 'User', entityId: student._id, description: `Lifecycle status updated to ${lifecycleStatus}`, statusCode: 200 });
+  logAudit(req, {
+    action: 'UPDATE_LIFECYCLE', entity: 'User', entityId: student._id,
+    description: `Lifecycle status updated to ${lifecycleStatus}`,
+    before: beforeLifecycle,
+    after: { lifecycleStatus, isActive: lifecycleStatus === 'active' },
+    statusCode: 200,
+  });
   return student;
 };
 
@@ -197,8 +213,12 @@ export const updateLecturerProfile = async (lecturerId, body, req) => {
   const user = await repo.findUserOne({ _id: lecturerId, institute: instituteId, role: 'lecturer' });
   if (!user) throw new AppError('Lecturer not found', 404);
   const { employeeId, department, position, dateOfJoining, dateOfBirth, gender, maritalStatus, bloodGroup, phoneNumber, address } = body;
+  const oldProfile = user.lecturerProfile?.toObject?.() ?? user.lecturerProfile ?? {};
+  const profileKeys = Object.keys(body).filter(k => body[k] !== undefined);
+  const beforeProfile = Object.fromEntries(profileKeys.map(k => [k, oldProfile[k] ?? null]));
+
   user.lecturerProfile = {
-    ...(user.lecturerProfile?.toObject?.() ?? user.lecturerProfile ?? {}),
+    ...oldProfile,
     ...(employeeId !== undefined && { employeeId }),
     ...(department !== undefined && { department }),
     ...(position !== undefined && { position }),
@@ -211,7 +231,13 @@ export const updateLecturerProfile = async (lecturerId, body, req) => {
     ...(address !== undefined && { address }),
   };
   await user.save();
-  logAudit(req, { action: 'UPDATE_LECTURER_PROFILE', entity: 'User', entityId: lecturerId, description: `Updated profile for lecturer ${user.fullName}`, statusCode: 200 });
+  logAudit(req, {
+    action: 'UPDATE_LECTURER_PROFILE', entity: 'User', entityId: lecturerId,
+    description: `Updated profile for lecturer ${user.fullName}`,
+    before: beforeProfile,
+    after: Object.fromEntries(profileKeys.map(k => [k, body[k]])),
+    statusCode: 200,
+  });
   return user;
 };
 
@@ -219,6 +245,8 @@ export const updateLecturer = async (lecturerId, { fullName, email, lecturerProf
   const instituteId = req.user.institute?._id || req.user.institute;
   const lecturer = await repo.findUserOne({ _id: lecturerId, institute: instituteId, role: 'lecturer' });
   if (!lecturer) throw new AppError('Lecturer not found', 404);
+
+  const beforeLecturer = { fullName: lecturer.fullName, email: lecturer.email };
 
   if (fullName) lecturer.fullName = fullName;
   if (email && email !== lecturer.email) {
@@ -233,7 +261,13 @@ export const updateLecturer = async (lecturerId, { fullName, email, lecturerProf
   await lecturer.save();
   const updated = await repo.findLecturerByIdFull(lecturerId);
 
-  logAudit(req, { action: 'UPDATE_LECTURER', entity: 'User', entityId: lecturerId, description: `Updated lecturer ${lecturer.fullName}`, statusCode: 200 });
+  logAudit(req, {
+    action: 'UPDATE_LECTURER', entity: 'User', entityId: lecturerId,
+    description: `Updated lecturer ${lecturer.fullName}`,
+    before: beforeLecturer,
+    after: { fullName: lecturer.fullName, email: lecturer.email },
+    statusCode: 200,
+  });
   return updated;
 };
 
@@ -241,8 +275,16 @@ export const updateLecturer = async (lecturerId, { fullName, email, lecturerProf
 
 export const resetPassword = async (userId, password, req) => {
   const hashedPassword = await bcrypt.hash(password, 12);
-  await repo.updateUserById(userId, { password: hashedPassword });
-  logAudit(req, { action: 'RESET_PASSWORD', entity: 'User', entityId: userId, description: `Reset password for user ${userId}`, statusCode: 200 });
+  const [, targetUser] = await Promise.all([
+    repo.updateUserById(userId, { password: hashedPassword }),
+    repo.findUserOne({ _id: userId }),
+  ]);
+  logAudit(req, {
+    action: 'RESET_PASSWORD', entity: 'User', entityId: userId,
+    description: `Reset password for user ${targetUser?.fullName ?? userId}`,
+    after: { passwordReset: true },
+    statusCode: 200,
+  });
 };
 
 export const suspendUser = async (userId, req) => {
@@ -253,7 +295,7 @@ export const suspendUser = async (userId, req) => {
   user.isActive = false;
   await user.save();
 
-  logAudit(req, { action: 'SUSPEND_USER', entity: 'User', entityId: user._id, description: `Suspended ${user.role} ${user.fullName} (${user.email})`, statusCode: 200 });
+  logAudit(req, { action: 'SUSPEND_USER', entity: 'User', entityId: user._id, description: `Suspended ${user.role} ${user.fullName} (${user.email})`, before: { isActive: true }, after: { isActive: false }, statusCode: 200 });
 };
 
 export const unsuspendUser = async (userId, req) => {
@@ -264,7 +306,7 @@ export const unsuspendUser = async (userId, req) => {
   user.isActive = true;
   await user.save();
 
-  logAudit(req, { action: 'UNSUSPEND_USER', entity: 'User', entityId: user._id, description: `Unsuspended ${user.role} ${user.fullName} (${user.email})`, statusCode: 200 });
+  logAudit(req, { action: 'UNSUSPEND_USER', entity: 'User', entityId: user._id, description: `Unsuspended ${user.role} ${user.fullName} (${user.email})`, before: { isActive: false }, after: { isActive: true }, statusCode: 200 });
 };
 
 export const deleteUser = async (userId, req) => {

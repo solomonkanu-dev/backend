@@ -4,6 +4,7 @@ import * as resultRepo from '../repositories/result.repository.js';
 import User from '../models/user.js';
 import Subject from '../models/Subject.js';
 import AcademicTerm from '../models/AcademicTerm.js';
+import Class from '../models/Class.js';
 import Result from '../models/Result.js';
 import { logAudit } from '../utils/audit.js';
 import { sendEmailNotification } from '../utils/email.js';
@@ -48,6 +49,11 @@ export const assignMarks = async (body, req) => {
     resolvedTermId = currentTerm?._id ?? null;
   }
 
+  const existing = await Result.findOne({ student: studentId, subject: subjectId, class: classId, term: resolvedTermId }).lean();
+  const beforeMarks = existing
+    ? { marksObtained: existing.marksObtained, grade: existing.grade, totalScore: existing.totalScore }
+    : null;
+
   const result = await resultRepo.findOneAndUpsert(
     { student: studentId, subject: subjectId, class: classId, term: resolvedTermId },
     { marksObtained, totalScore: effectiveTotalScore, grade, institute: instituteId }
@@ -57,7 +63,9 @@ export const assignMarks = async (body, req) => {
     action: 'ASSIGN_MARKS',
     entity: 'Result',
     entityId: result._id,
-    description: `Assigned ${marksObtained}/${effectiveTotalScore} (${percentage}%, grade ${grade}) to student ${studentId} for subject ${subjectId}`,
+    description: `Assigned ${marksObtained}/${effectiveTotalScore} (${percentage}%, grade ${grade}) to student ${student.fullName} for subject ${subject.name}`,
+    before: beforeMarks,
+    after: { marksObtained, totalScore: effectiveTotalScore, percentage, grade },
     statusCode: 200,
   });
 
@@ -88,10 +96,16 @@ export const publishResults = async (classId, termId, req) => {
     { class: classId, term: termId, institute: instituteId },
     { $set: { isPublished: true } }
   );
+  const [cls, term] = await Promise.all([
+    Class.findById(classId).select('name').lean(),
+    AcademicTerm.findById(termId).select('name').lean(),
+  ]);
   logAudit(req, {
     action: 'PUBLISH_RESULTS',
     entity: 'Result',
-    description: `Published ${modifiedCount} result(s) for class ${classId} term ${termId}`,
+    description: `Published ${modifiedCount} result(s) for class ${cls?.name ?? classId} term ${term?.name ?? termId}`,
+    before: { isPublished: false },
+    after:  { isPublished: true, count: modifiedCount },
     statusCode: 200,
   });
   return { matched: matchedCount, modified: modifiedCount };
@@ -103,10 +117,16 @@ export const unpublishResults = async (classId, termId, req) => {
     { class: classId, term: termId, institute: instituteId },
     { $set: { isPublished: false } }
   );
+  const [cls, term] = await Promise.all([
+    Class.findById(classId).select('name').lean(),
+    AcademicTerm.findById(termId).select('name').lean(),
+  ]);
   logAudit(req, {
     action: 'UNPUBLISH_RESULTS',
     entity: 'Result',
-    description: `Unpublished ${modifiedCount} result(s) for class ${classId} term ${termId}`,
+    description: `Unpublished ${modifiedCount} result(s) for class ${cls?.name ?? classId} term ${term?.name ?? termId}`,
+    before: { isPublished: true },
+    after:  { isPublished: false, count: modifiedCount },
     statusCode: 200,
   });
   return { matched: matchedCount, modified: modifiedCount };

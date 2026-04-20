@@ -9,6 +9,7 @@ import {
   getStudentClasses,
   getInstituteClasses,
   getStudentByClass,
+  updateClass,
 } from "../controllers/class.controller.js";
 import auth from "../middlewares/auth.js";
 import { adminOnly } from "../middlewares/adminOnly.js";
@@ -37,5 +38,6 @@ router.patch(
   validate,
   assignLecturerToClass
 );
+router.patch("/:classId", auth, adminOnly, updateClass);
 
 export default router;

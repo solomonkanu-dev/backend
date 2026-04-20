@@ -52,6 +52,24 @@ export const getClassById = async (id, user) => {
   return singleClass;
 };
 
+export const updateClass = async (classId, { name, lecturerId }, user) => {
+  if (user.role !== 'admin') throw new AppError('Access denied', 403);
+
+  const instituteId = user.institute?._id || user.institute;
+  const singleClass = await classRepo.findOne({ _id: classId, institute: instituteId });
+  if (!singleClass) throw new AppError('Class not found', 404);
+
+  if (name) singleClass.name = name.trim();
+
+  if (lecturerId) {
+    const lecturer = await classRepo.findLecturer(lecturerId, instituteId);
+    if (!lecturer) throw new AppError('Lecturer not found', 404);
+    singleClass.lecturer = lecturer._id;
+  }
+
+  return classRepo.save(singleClass);
+};
+
 export const assignLecturerToClass = async (body, user) => {
   if (user.role !== 'admin') throw new AppError('Access denied', 403);
 

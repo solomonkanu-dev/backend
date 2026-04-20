@@ -20,10 +20,7 @@ const studentFeeSchema = new mongoose.Schema(
     },
     fees: [
       {
-        fee: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "FeeParticular",
-        },
+        label: { type: String },
         amount: Number,
         paid: {
           type: Number,
@@ -38,6 +35,12 @@ const studentFeeSchema = new mongoose.Schema(
       enum: ["unpaid", "partial", "paid"],
       default: "unpaid",
     },
+    feeStructures: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "FeeStructure",
+      },
+    ],
   },
   { timestamps: true }
 );

@@ -28,7 +28,7 @@ const auth = async (req, res, next) => {
     // 4️⃣ Fetch user
     const user = await User.findById(payload.id)
       .select("-password")
-      .populate("institute", "name schoolType onboardingCompleted");
+      .populate("institute", "name logo schoolType onboardingCompleted");
 
     if (!user) {
       return res.status(401).json({ message: "User not found" });

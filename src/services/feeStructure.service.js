@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import * as repo from '../repositories/feeStructure.repository.js';
 import Class from '../models/Class.js';
 import User from '../models/user.js';
+import StudentFee from '../models/StudentFee.js';
 import { AppError } from '../errors/AppError.js';
 
 const computeTotal = (particulars = []) =>
@@ -39,13 +40,17 @@ export const createFeeStructure = async ({ category, classId, studentId, particu
 };
 
 export const getFeeStructures = async (query, user) => {
-  const { category, classId, studentId, instituteId, page = 1, limit = 20 } = query;
+  const { category, classId, studentId, page = 1, limit = 20 } = query;
+  let { instituteId } = query;
   const q = {};
   if (category) q.category = category;
   if (classId) q.classId = classId;
   if (studentId) q.studentId = studentId;
   if (instituteId) q.instituteId = instituteId;
-  else if (user?.institute) q.instituteId = user.institute;
+  else if (user?.institute) {
+    q.instituteId = user.institute;
+    instituteId = user.institute?._id || user.institute;
+  }
 
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const lim = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
@@ -55,7 +60,20 @@ export const getFeeStructures = async (query, user) => {
     repo.countDocuments(q),
   ]);
 
-  return { data: items, meta: { page: pageNum, limit: lim, total } };
+  // Compute isAssigned: a structure is assigned only if at least one StudentFee
+  // explicitly references it in the feeStructures array — no proxy heuristics.
+  const structureIds = items.map(i => i._id);
+  const assignedIds = structureIds.length > 0
+    ? await StudentFee.distinct('feeStructures', { feeStructures: { $in: structureIds }, institute: instituteId })
+    : [];
+  const assignedSet = new Set(assignedIds.map(id => id.toString()));
+
+  const data = items.map(item => ({
+    ...item.toObject(),
+    isAssigned: assignedSet.has(item._id.toString()),
+  }));
+
+  return { data, meta: { page: pageNum, limit: lim, total } };
 };
 
 export const getFeeStructureById = async (id) => {

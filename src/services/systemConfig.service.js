@@ -36,6 +36,8 @@ export const toggleGlobalMaintenance = async ({ enabled, message }, req) => {
     entity: 'SystemConfig',
     entityId: config._id,
     description: `Global maintenance ${enabled ? 'enabled' : 'disabled'}`,
+    before: { enabled: !enabled },
+    after:  { enabled, message: message ?? null },
     statusCode: 200,
   });
 
@@ -71,7 +73,9 @@ export const toggleInstituteMaintenance = async ({ instituteId, enabled, message
     action: 'TOGGLE_INSTITUTE_MAINTENANCE',
     entity: 'Institute',
     entityId: instituteId,
-    description: `Institute maintenance ${enabled ? 'enabled' : 'disabled'} for ${instituteId}`,
+    description: `Institute maintenance ${enabled ? 'enabled' : 'disabled'}`,
+    before: { enabled: !enabled },
+    after:  { enabled, message: message ?? null },
     statusCode: 200,
   });
 

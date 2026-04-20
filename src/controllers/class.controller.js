@@ -97,3 +97,12 @@ export const getStudentByClass = async (req, res, next) => {
     next(err);
   }
 };
+
+export const updateClass = async (req, res, next) => {
+  try {
+    const updated = await classService.updateClass(req.params.classId, req.body, req.user);
+    res.json({ message: "Class updated successfully", class: updated });
+  } catch (err) {
+    next(err);
+  }
+};

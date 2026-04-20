@@ -12,7 +12,7 @@ import AuditLog from "../models/AuditLog.js";
  * @param {string} [options.description] - Human-readable summary
  * @param {number} [options.statusCode]  - HTTP status code of the response
  */
-export const logAudit = async (req, { action, entity = "", entityId = null, description = "", statusCode = null, userOverride = null }) => {
+export const logAudit = async (req, { action, entity = "", entityId = null, description = "", statusCode = null, userOverride = null, before = null, after = null }) => {
   try {
     const actor = userOverride || req.user;
     if (!actor) return;
@@ -29,6 +29,8 @@ export const logAudit = async (req, { action, entity = "", entityId = null, desc
       entity,
       entityId: entityId || null,
       description,
+      before,
+      after,
       ipAddress: req.ip || req.headers["x-forwarded-for"] || "",
       userAgent: req.headers["user-agent"] || "",
       method: req.method,

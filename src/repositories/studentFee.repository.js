@@ -28,4 +28,7 @@ export const findFeesForStudent = (studentId, instituteId) =>
     .populate('class', 'name');
 
 export const findStudentFeesByFilter = (filter) =>
-  StudentFee.find(filter).populate('fees.fee', 'title').populate('class', 'name').lean();
+  StudentFee.find(filter).populate('class', 'name').lean();
+
+export const updateStudentFeeById = (id, update) =>
+  StudentFee.findByIdAndUpdate(id, update, { new: true });

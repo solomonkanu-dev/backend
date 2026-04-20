@@ -38,6 +38,8 @@ const auditLogSchema = new mongoose.Schema(
       trim: true,
       default: "",   // human-readable summary
     },
+    before: { type: mongoose.Schema.Types.Mixed, default: null },
+    after:  { type: mongoose.Schema.Types.Mixed, default: null },
     ipAddress: { type: String, default: "" },
     userAgent: { type: String, default: "" },
     method: { type: String, default: "" },

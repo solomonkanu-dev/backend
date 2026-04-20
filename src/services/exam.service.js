@@ -85,6 +85,7 @@ export const updateExam = async (examId, body, req) => {
     if (body[key] !== undefined) update[key] = body[key];
   }
 
+  const beforeExam = Object.fromEntries(Object.keys(update).map(k => [k, exam[k] ?? null]));
   const updated = await repo.updateById(examId, update);
 
   logAudit(req, {
@@ -92,6 +93,8 @@ export const updateExam = async (examId, body, req) => {
     entity: 'Exam',
     entityId: examId,
     description: `Updated exam "${exam.title}"`,
+    before: beforeExam,
+    after: update,
     statusCode: 200,
   });
 

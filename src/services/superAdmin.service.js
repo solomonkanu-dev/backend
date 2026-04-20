@@ -35,6 +35,8 @@ export const approveAdmin = async (adminId, req) => {
     entity: 'User',
     entityId: admin._id,
     description: `Approved admin ${admin.fullName} (${admin.email})`,
+    before: { approved: false },
+    after:  { approved: true },
     statusCode: 200,
   });
 };
@@ -77,6 +79,8 @@ export const suspendAdmin = async (adminId, req) => {
     entity: 'User',
     entityId: admin._id,
     description: `Suspended admin ${admin.fullName} (${admin.email})`,
+    before: { isActive: true },
+    after:  { isActive: false },
     statusCode: 200,
   });
 };
@@ -94,6 +98,8 @@ export const unsuspendAdmin = async (adminId, req) => {
     entity: 'User',
     entityId: admin._id,
     description: `Unsuspended admin ${admin.fullName} (${admin.email})`,
+    before: { isActive: false },
+    after:  { isActive: true },
     statusCode: 200,
   });
 };
@@ -210,7 +216,13 @@ export const setAdminUnderReview = async (adminId, note, req) => {
   });
   await admin.save();
 
-  logAudit(req, { action: 'SET_ADMIN_UNDER_REVIEW', entity: 'User', entityId: admin._id, description: `Set admin ${admin.fullName} (${admin.email}) under review`, statusCode: 200 });
+  logAudit(req, {
+    action: 'SET_ADMIN_UNDER_REVIEW', entity: 'User', entityId: admin._id,
+    description: `Set admin ${admin.fullName} (${admin.email}) under review`,
+    before: { onboardingStatus: 'pending' },
+    after:  { onboardingStatus: 'under_review', reviewNote: note || '' },
+    statusCode: 200,
+  });
   return admin;
 };
 
@@ -224,7 +236,13 @@ export const approveAdminOnboarding = async (adminId, note, req) => {
   admin.onboarding.transitions.push({ from, to: 'approved', changedBy: req.user._id, changedAt: new Date(), note: note || '' });
   await admin.save();
 
-  logAudit(req, { action: 'APPROVE_ADMIN', entity: 'User', entityId: admin._id, description: `Approved admin onboarding for ${admin.fullName} (${admin.email})`, statusCode: 200 });
+  logAudit(req, {
+    action: 'APPROVE_ADMIN', entity: 'User', entityId: admin._id,
+    description: `Approved admin onboarding for ${admin.fullName} (${admin.email})`,
+    before: { onboardingStatus: from, approved: false },
+    after:  { onboardingStatus: 'approved', approved: true },
+    statusCode: 200,
+  });
 
   notify({ recipientId: admin._id, type: 'admin_approved', title: 'Account Approved', message: 'Your admin account has been approved. You can now log in.' });
 
@@ -245,7 +263,13 @@ export const rejectAdminOnboarding = async (adminId, rejectionReason, req) => {
   admin.onboarding.transitions.push({ from, to: 'rejected', changedBy: req.user._id, changedAt: new Date(), note: rejectionReason });
   await admin.save();
 
-  logAudit(req, { action: 'REJECT_ADMIN', entity: 'User', entityId: admin._id, description: `Rejected admin onboarding for ${admin.fullName} (${admin.email}): ${rejectionReason}`, statusCode: 200 });
+  logAudit(req, {
+    action: 'REJECT_ADMIN', entity: 'User', entityId: admin._id,
+    description: `Rejected admin onboarding for ${admin.fullName} (${admin.email}): ${rejectionReason}`,
+    before: { onboardingStatus: from, approved: true, isActive: true },
+    after:  { onboardingStatus: 'rejected', approved: false, isActive: false, rejectionReason },
+    statusCode: 200,
+  });
 
   notify({ recipientId: admin._id, type: 'admin_rejected', title: 'Account Rejected', message: `Your admin account request was rejected. Reason: ${rejectionReason}` });
 

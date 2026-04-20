@@ -142,6 +142,10 @@ export const markAsRead = async (id, user) => {
 export const updateAnnouncement = async (id, body, req) => {
   const { title, body: announcementBody, isActive, expiresAt } = body;
 
+  const existing = await announcementRepo.findById(id);
+  if (!existing) throw new AppError('Announcement not found', 404);
+  const beforeAnnouncement = { title: existing.title, body: existing.body, isActive: existing.isActive, expiresAt: existing.expiresAt ?? null };
+
   const announcement = await announcementRepo.findByIdAndUpdate(id, {
     ...(title !== undefined && { title }),
     ...(announcementBody !== undefined && { body: announcementBody }),
@@ -155,7 +159,9 @@ export const updateAnnouncement = async (id, body, req) => {
     action: 'UPDATE_ANNOUNCEMENT',
     entity: 'Announcement',
     entityId: announcement._id,
-    description: `Updated announcement: ${announcement.title}`,
+    description: `Updated announcement: ${beforeAnnouncement.title}`,
+    before: beforeAnnouncement,
+    after: { title: announcement.title, body: announcement.body, isActive: announcement.isActive, expiresAt: announcement.expiresAt ?? null },
     statusCode: 200,
   });
 
