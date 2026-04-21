@@ -151,6 +151,9 @@ const userSchema = new mongoose.Schema(
 
     emailOptOut: { type: [String], default: [] },
 
+    archivedAt: { type: Date, default: null },
+    archiveNote: { type: String, default: '' },
+
     // QR attendance
     qrToken: { type: String, default: null },
     qrActive: { type: Boolean, default: true },

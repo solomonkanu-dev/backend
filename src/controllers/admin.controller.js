@@ -426,3 +426,51 @@ export const updateMyProfile = async (req, res, next) => {
     next(err);
   }
 };
+
+export const archiveUser = async (req, res, next) => {
+  try {
+    await adminService.archiveUser(req.params.userId, req.body.note, req);
+    res.json({ success: true, message: 'User archived successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const restoreUser = async (req, res, next) => {
+  try {
+    await adminService.restoreUser(req.params.userId, req);
+    res.json({ success: true, message: 'User restored successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getArchivedStudents = async (req, res, next) => {
+  try {
+    const instituteId = req.user.institute?._id ?? req.user.institute;
+    const data = await adminService.getArchivedStudents(instituteId);
+    res.json({ success: true, total: data.length, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getArchivedLecturers = async (req, res, next) => {
+  try {
+    const instituteId = req.user.institute?._id ?? req.user.institute;
+    const data = await adminService.getArchivedLecturers(instituteId);
+    res.json({ success: true, total: data.length, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getArchivedUserDetail = async (req, res, next) => {
+  try {
+    const instituteId = req.user.institute?._id ?? req.user.institute;
+    const data = await adminService.getArchivedUserDetail(req.params.userId, instituteId);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};

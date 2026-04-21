@@ -5,6 +5,9 @@ import * as repo from '../repositories/admin.repository.js';
 import { AppError } from '../errors/AppError.js';
 import { logAudit } from '../utils/audit.js';
 import { notify, notifySuperAdmins } from '../utils/notify.js';
+import User from '../models/user.js';
+import FeePayment from '../models/FeePayment.js';
+import Result from '../models/Result.js';
 
 // ─── Admin Signup ─────────────────────────────────────────────────────────────
 
@@ -75,7 +78,7 @@ export const getAllStudents = async (query, user) => {
   const page = parseInt(query.page) || 1;
   const limit = Math.min(parseInt(query.limit) || 20, 100);
   const skip = (page - 1) * limit;
-  const filter = { role: 'student', institute: user.institute };
+  const filter = { role: 'student', institute: user.institute, archivedAt: null };
   const [data, total] = await Promise.all([
     repo.findStudentsPaginated(filter, skip, limit),
     repo.countUsers(filter),
@@ -193,7 +196,7 @@ export const getAllLecturers = async (query, user) => {
   const page = parseInt(query.page) || 1;
   const limit = Math.min(parseInt(query.limit) || 20, 100);
   const skip = (page - 1) * limit;
-  const filter = { role: 'lecturer', institute: user.institute };
+  const filter = { role: 'lecturer', institute: user.institute, archivedAt: null };
   const [data, total] = await Promise.all([
     repo.findUsersPaginated(filter, skip, limit),
     repo.countUsers(filter),
@@ -748,4 +751,95 @@ export const updateMyProfile = async (userId, { fullName, email }) => {
   if (fullName) user.fullName = fullName;
   await user.save();
   return user;
+};
+
+// ─── Archive ──────────────────────────────────────────────────────────────────
+
+export const archiveUser = async (userId, note, req) => {
+  const instituteId = req.user.institute?._id ?? req.user.institute;
+  const user = await User.findOne({ _id: userId, institute: instituteId, archivedAt: null });
+  if (!user) throw new AppError('User not found or already archived', 404);
+
+  const before = { archivedAt: null, isActive: user.isActive };
+  user.archivedAt = new Date();
+  user.archiveNote = note ?? '';
+  user.isActive = false;
+  await user.save();
+
+  logAudit(req, {
+    action: 'ARCHIVE_USER',
+    entity: 'User',
+    entityId: user._id,
+    description: `Archived ${user.role} ${user.fullName} (${user.email})`,
+    before,
+    after: { archivedAt: user.archivedAt, isActive: false },
+    statusCode: 200,
+  });
+};
+
+export const restoreUser = async (userId, req) => {
+  const instituteId = req.user.institute?._id ?? req.user.institute;
+  const user = await User.findOne({ _id: userId, institute: instituteId, archivedAt: { $ne: null } });
+  if (!user) throw new AppError('Archived user not found', 404);
+
+  const before = { archivedAt: user.archivedAt, isActive: user.isActive };
+  user.archivedAt = null;
+  user.archiveNote = '';
+  user.isActive = true;
+  await user.save();
+
+  logAudit(req, {
+    action: 'RESTORE_USER',
+    entity: 'User',
+    entityId: user._id,
+    description: `Restored ${user.role} ${user.fullName} (${user.email}) from archive`,
+    before,
+    after: { archivedAt: null, isActive: true },
+    statusCode: 200,
+  });
+};
+
+export const getArchivedStudents = async (instituteId) => {
+  return User.find({ institute: instituteId, role: 'student', archivedAt: { $ne: null } })
+    .select('-password')
+    .populate('class', 'name')
+    .sort({ archivedAt: -1 })
+    .lean();
+};
+
+export const getArchivedLecturers = async (instituteId) => {
+  return User.find({ institute: instituteId, role: 'lecturer', archivedAt: { $ne: null } })
+    .select('-password')
+    .sort({ archivedAt: -1 })
+    .lean();
+};
+
+export const getArchivedUserDetail = async (userId, instituteId) => {
+  const user = await User.findOne({ _id: userId, institute: instituteId, archivedAt: { $ne: null } })
+    .select('-password')
+    .populate('class', 'name')
+    .lean();
+  if (!user) throw new AppError('Archived user not found', 404);
+
+  const [fees, results, attendanceTotal, attendancePresent] = await Promise.all([
+    FeePayment.find({ student: userId }).sort({ createdAt: -1 }).lean(),
+    Result.find({ student: userId })
+      .populate('subject', 'name')
+      .populate('term', 'name academicYear')
+      .sort({ createdAt: -1 })
+      .lean(),
+    repo.countAttendanceByStudent(userId, instituteId),
+    repo.countAttendancePresentByStudent(userId, instituteId),
+  ]);
+
+  return {
+    user,
+    fees,
+    results,
+    attendanceSummary: {
+      total: attendanceTotal,
+      present: attendancePresent,
+      absent: attendanceTotal - attendancePresent,
+    },
+  };
 };

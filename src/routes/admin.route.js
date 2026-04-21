@@ -223,4 +223,13 @@ router.delete("/calendar/:id", auth, adminOnly, deleteCalendarEvent);
 router.get("/students/:studentId/qr", auth, adminOnly, getStudentQR);
 router.patch("/students/:studentId/qr", auth, adminOnly, toggleStudentQR);
 
+// Archive
+import { archiveUser, restoreUser, getArchivedStudents, getArchivedLecturers, getArchivedUserDetail } from '../controllers/admin.controller.js';
+
+router.get('/archive/students',          auth, adminOnly, getArchivedStudents);
+router.get('/archive/lecturers',         auth, adminOnly, getArchivedLecturers);
+router.get('/archive/:userId',           auth, adminOnly, getArchivedUserDetail);
+router.patch('/archive/:userId',         auth, adminOnly, archiveUser);
+router.patch('/archive/:userId/restore', auth, adminOnly, restoreUser);
+
 export default router;
