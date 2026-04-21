@@ -185,6 +185,9 @@ function createTransporter(smtp) {
       // App Passwords are displayed with spaces — strip them
       pass: smtp.pass?.replace(/\s/g, ''),
     },
+    connectionTimeout: 10_000,  // 10 s to establish TCP connection
+    greetingTimeout:   8_000,   // 8 s to receive SMTP greeting
+    socketTimeout:     15_000,  // 15 s of socket inactivity before giving up
   });
 }
 
