@@ -10,6 +10,15 @@ export const superAdminLogin = async (req, res, next) => {
   }
 };
 
+export const deletePendingAdmin = async (req, res, next) => {
+  try {
+    await superAdminService.deletePendingAdmin(req.params.adminId, req);
+    res.json({ message: 'Pending admin request deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const approveAdmin = async (req, res, next) => {
   try {
     await superAdminService.approveAdmin(req.params.adminId, req);

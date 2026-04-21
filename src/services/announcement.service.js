@@ -2,6 +2,7 @@ import { AppError } from '../errors/AppError.js';
 import * as announcementRepo from '../repositories/announcement.repository.js';
 import { logAudit } from '../utils/audit.js';
 import { sendEmailNotification } from '../utils/email.js';
+import { sendSmsNotification } from '../utils/sms.js';
 
 // ─── Private: fire-and-forget email to targeted users ────────────────────────
 
@@ -27,21 +28,21 @@ async function notifyAnnouncementByEmail(announcement, requestingUser) {
     };
 
     const recipients = await User.find(userFilter)
-      .select('_id email fullName emailOptOut')
+      .select('_id email fullName emailOptOut studentProfile lecturerProfile')
       .limit(100)
       .lean();
 
+    const notifData = { title: announcement.title, body: announcement.body };
+
     await Promise.allSettled(
-      recipients.map((u) =>
-        sendEmailNotification({
-          instituteId,
-          type: 'announcement',
-          recipientId: u._id,
-          recipientEmail: u.email,
-          instituteName,
-          data: { title: announcement.title, body: announcement.body },
-        })
-      )
+      recipients.flatMap((u) => {
+        const phone = u.studentProfile?.mobileNumber ?? u.lecturerProfile?.phoneNumber;
+        const meta = { instituteId, type: 'announcement', recipientId: u._id, instituteName, data: notifData };
+        return [
+          sendEmailNotification({ ...meta, recipientEmail: u.email }),
+          sendSmsNotification({ ...meta, recipientPhone: phone }),
+        ];
+      })
     );
   } catch {
     // fire-and-forget — never throws

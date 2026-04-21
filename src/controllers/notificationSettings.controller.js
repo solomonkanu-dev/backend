@@ -31,6 +31,16 @@ export const sendTestEmail = async (req, res, next) => {
   }
 };
 
+export const sendTestSms = async (req, res, next) => {
+  try {
+    const { testPhone } = req.body;
+    await notificationSettingsService.sendTestSms(testPhone);
+    res.json({ message: `Test SMS sent to ${testPhone}` });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getEmailLogs = async (req, res, next) => {
   try {
     const instituteId = req.user.institute?._id || req.user.institute;

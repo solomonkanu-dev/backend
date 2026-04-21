@@ -1,6 +1,7 @@
 import { AppError } from '../errors/AppError.js';
 import * as assignmentRepo from '../repositories/assignment.repository.js';
 import { sendEmailNotification } from '../utils/email.js';
+import { sendSmsNotification } from '../utils/sms.js';
 
 // ─── Private: fire-and-forget email to students ───────────────────────────────
 
@@ -27,22 +28,21 @@ async function notifyAssignmentByEmail(assignment, requestingUser) {
 
     const students = await assignmentRepo.findStudentsByClass(assignment.class, instituteId);
 
+    const notifData = {
+      title: assignment.title,
+      subject: subjectName,
+      dueDate: dueDateStr,
+      totalMarks: assignment.totalMarks ?? 100,
+    };
+
     await Promise.allSettled(
-      students.map((s) =>
-        sendEmailNotification({
-          instituteId,
-          type: 'assignmentPosted',
-          recipientId: s._id,
-          recipientEmail: s.email,
-          instituteName,
-          data: {
-            title: assignment.title,
-            subject: subjectName,
-            dueDate: dueDateStr,
-            totalMarks: assignment.totalMarks ?? 100,
-          },
-        })
-      )
+      students.flatMap((s) => {
+        const meta = { instituteId, type: 'assignmentPosted', recipientId: s._id, instituteName, data: notifData };
+        return [
+          sendEmailNotification({ ...meta, recipientEmail: s.email }),
+          sendSmsNotification({ ...meta, recipientPhone: s.studentProfile?.mobileNumber }),
+        ];
+      })
     );
   } catch {
     // fire-and-forget — never throws

@@ -201,11 +201,12 @@ router.patch("/parents/:parentId/revoke", auth, adminOnly, revokeParentAccess);
 router.patch("/parents/:parentId/restore", auth, adminOnly, restoreParentAccess);
 
 // Notification settings
-import { getSettings, updateSettings, sendTestEmail, getEmailLogs } from '../controllers/notificationSettings.controller.js';
+import { getSettings, updateSettings, sendTestEmail, sendTestSms, getEmailLogs } from '../controllers/notificationSettings.controller.js';
 
 router.get('/notification-settings', auth, adminOnly, getSettings);
 router.patch('/notification-settings', auth, adminOnly, updateSettings);
 router.post('/notification-settings/test-email', auth, adminOnly, sendTestEmail);
+router.post('/notification-settings/test-sms', auth, adminOnly, sendTestSms);
 router.get('/notification-settings/logs', auth, adminOnly, getEmailLogs);
 
 // Timetable — admin write operations

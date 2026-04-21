@@ -5,6 +5,7 @@ import User from '../models/user.js';
 import Institute from '../models/Institute.js';
 import { AppError } from '../errors/AppError.js';
 import { sendEmailNotification } from '../utils/email.js';
+import { sendSmsNotification } from '../utils/sms.js';
 
 export const getStudentsForAttendance = async (classId, user) => {
   if (!classId) throw new AppError('classId is required', 400);
@@ -72,17 +73,14 @@ async function checkAndSendAttendanceAlerts(attendanceDoc, requestingUser) {
           const rate = Number(((present / total) * 100).toFixed(1));
           if (rate >= 75) return;
 
-          const student = await User.findById(studentId).select('fullName email').lean();
-          if (!student?.email) return;
+          const student = await User.findById(studentId).select('fullName email studentProfile').lean();
+          if (!student) return;
 
-          await sendEmailNotification({
-            instituteId,
-            type: 'attendanceAlert',
-            recipientId: studentId,
-            recipientEmail: student.email,
-            instituteName,
-            data: { studentName: student.fullName, rate, totalClasses: total },
-          });
+          const notifData = { studentName: student.fullName, rate, totalClasses: total };
+          const notifMeta = { instituteId, type: 'attendanceAlert', recipientId: studentId, instituteName, data: notifData };
+
+          await sendEmailNotification({ ...notifMeta, recipientEmail: student.email });
+          sendSmsNotification({ ...notifMeta, recipientPhone: student.studentProfile?.mobileNumber }).catch(() => {});
         } catch { /* per-student failure swallowed */ }
       })
     );

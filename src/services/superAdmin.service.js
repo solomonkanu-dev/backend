@@ -26,6 +26,21 @@ export const superAdminLogin = async ({ email, password }) => {
   };
 };
 
+export const deletePendingAdmin = async (adminId, req) => {
+  const admin = await User.findOne({ _id: adminId, approved: false, role: 'admin' });
+  if (!admin) throw new AppError('Pending admin request not found', 404);
+
+  await User.deleteOne({ _id: adminId });
+
+  logAudit(req, {
+    action: 'DELETE',
+    entity: 'User',
+    entityId: adminId,
+    description: `Deleted pending admin request for ${admin.fullName} (${admin.email})`,
+    statusCode: 200,
+  });
+};
+
 export const approveAdmin = async (adminId, req) => {
   const admin = await repo.approveUserById(adminId);
   if (!admin) throw new AppError('User not found', 404);

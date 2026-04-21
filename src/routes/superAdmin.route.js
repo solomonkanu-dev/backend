@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { body, param, validationResult } from 'express-validator';
 import {
   approveAdmin,
+  deletePendingAdmin,
   getPendingAdmins,
   superAdminLogin,
   getSystemStats,
@@ -71,6 +72,7 @@ router.get(
 
 
 router.get('/pending-admins', auth, superAdminOnly, getPendingAdmins);
+router.delete('/pending-admins/:adminId', auth, superAdminOnly, deletePendingAdmin);
 router.get('/admins', auth, superAdminOnly, getAllAdmins);
 router.patch('/admins/:adminId/suspend', auth, superAdminOnly, suspendAdmin);
 router.patch('/admins/:adminId/unsuspend', auth, superAdminOnly, unsuspendAdmin);

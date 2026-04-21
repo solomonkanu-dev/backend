@@ -2,6 +2,7 @@ import * as repo from '../repositories/notificationSettings.repository.js';
 import Institute from '../models/Institute.js';
 import { AppError } from '../errors/AppError.js';
 import { sendTestEmailDirect } from '../utils/email.js';
+import { sendTestSmsDirect } from '../utils/sms.js';
 
 export const getSettings = async (instituteId) => {
   let settings = await repo.findByInstitute(instituteId);
@@ -60,6 +61,12 @@ export const sendTestEmail = async (instituteId, testEmail, userId) => {
   if (status === 'failed') throw new AppError(`Failed to send test email: ${errorMsg}`, 502);
 
   return testEmail;
+};
+
+export const sendTestSms = async (testPhone) => {
+  if (!testPhone) throw new AppError('testPhone is required', 400);
+  await sendTestSmsDirect(testPhone);
+  return testPhone;
 };
 
 export const getEmailLogs = async (instituteId, pageParam) => {

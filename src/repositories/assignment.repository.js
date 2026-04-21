@@ -36,5 +36,5 @@ export const findSubjectById = (id) => Subject.findById(id).select('name').lean(
 
 export const findStudentsByClass = (classId, instituteId) =>
   User.find({ class: classId, institute: instituteId, role: 'student', isActive: true })
-    .select('_id email fullName emailOptOut')
+    .select('_id email fullName emailOptOut studentProfile')
     .lean();

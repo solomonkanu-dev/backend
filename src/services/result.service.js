@@ -8,6 +8,7 @@ import Class from '../models/Class.js';
 import Result from '../models/Result.js';
 import { logAudit } from '../utils/audit.js';
 import { sendEmailNotification } from '../utils/email.js';
+import { sendSmsNotification } from '../utils/sms.js';
 
 const getInstituteId = (user) => user.institute?._id || user.institute;
 
@@ -20,7 +21,7 @@ export const assignMarks = async (body, req) => {
   const { studentId, subjectId, classId, marksObtained, totalScore, termId } = body;
   const instituteId = user.institute?._id || user.institute;
 
-  const student = await User.findOne({ _id: studentId, role: 'student', institute: instituteId });
+  const student = await User.findOne({ _id: studentId, role: 'student', institute: instituteId }).select('+studentProfile');
   if (!student) throw new AppError('Student not found', 404);
 
   const subject = await Subject.findOne({ _id: subjectId, class: classId, institute: instituteId });
@@ -72,20 +73,17 @@ export const assignMarks = async (body, req) => {
   // Fire-and-forget email notification
   const { default: Institute } = await import('../models/Institute.js');
   const institute = await Institute.findById(instituteId).select('name').lean();
-  sendEmailNotification({
-    instituteId,
-    type: 'resultsPublished',
-    recipientId: studentId,
-    recipientEmail: student.email,
-    instituteName: institute?.name ?? 'Institution',
-    data: {
-      studentName: student.fullName,
-      subject: subject.name,
-      marksObtained,
-      totalMarks: effectiveTotalScore,
-      grade: result.grade ?? 'N/A',
-    },
-  }).catch(() => {});
+  const notifData = {
+    studentName: student.fullName,
+    subject: subject.name,
+    marksObtained,
+    totalMarks: effectiveTotalScore,
+    grade: result.grade ?? 'N/A',
+  };
+  const notifMeta = { instituteId, type: 'resultsPublished', recipientId: studentId, instituteName: institute?.name ?? 'Institution', data: notifData };
+
+  sendEmailNotification({ ...notifMeta, recipientEmail: student.email }).catch(() => {});
+  sendSmsNotification({ ...notifMeta, recipientPhone: student.studentProfile?.mobileNumber }).catch(() => {});
 
   return result;
 };

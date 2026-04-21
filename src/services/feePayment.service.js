@@ -4,6 +4,7 @@ import User from '../models/user.js';
 import { AppError } from '../errors/AppError.js';
 import { logAudit } from '../utils/audit.js';
 import { sendEmailNotification } from '../utils/email.js';
+import { sendSmsNotification } from '../utils/sms.js';
 
 async function generateReceiptNumber(instituteId) {
   const year = new Date().getFullYear();
@@ -52,7 +53,7 @@ export const recordPayment = async (studentId, { amount, method = 'cash', refere
   studentFee.status = studentFee.balance <= 0 ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
   await studentFee.save();
 
-  const student = await User.findById(studentId).select('fullName email').lean();
+  const student = await User.findById(studentId).select('fullName email studentProfile').lean();
 
   logAudit(req, {
     action: 'CREATE_PAYMENT',
@@ -63,21 +64,18 @@ export const recordPayment = async (studentId, { amount, method = 'cash', refere
   });
 
   const institute = await Institute.findById(instituteId).select('name').lean();
-  sendEmailNotification({
-    instituteId,
-    type: 'feePayment',
-    recipientId: studentId,
-    recipientEmail: student?.email,
-    instituteName: institute?.name ?? 'Institution',
-    data: {
-      studentName: student?.fullName ?? 'Student',
-      receiptNumber,
-      amount: payAmount,
-      method,
-      balance: studentFee.balance,
-      date: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }),
-    },
-  }).catch(() => {});
+  const notifData = {
+    studentName: student?.fullName ?? 'Student',
+    receiptNumber,
+    amount: payAmount,
+    method,
+    balance: studentFee.balance,
+    date: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }),
+  };
+  const notifMeta = { instituteId, type: 'feePayment', recipientId: studentId, instituteName: institute?.name ?? 'Institution', data: notifData };
+
+  sendEmailNotification({ ...notifMeta, recipientEmail: student?.email }).catch(() => {});
+  sendSmsNotification({ ...notifMeta, recipientPhone: student?.studentProfile?.mobileNumber }).catch(() => {});
 
   return { payment, receiptNumber };
 };
