@@ -14,11 +14,13 @@ const signToken = (user) =>
 export const login = async (body, req) => {
   const { email, password } = body;
 
-  const user = await authRepo.findByEmailWithInstitute(email);
+  const user = await authRepo.findByEmailForLogin(email);
   if (!user) throw new AppError('Invalid credentials', 401);
 
   if (!user.approved) throw new AppError('Account pending approval', 403);
   if (!user.isActive) throw new AppError('Account has been suspended', 403);
+
+  if (!user.password) throw new AppError('Invalid credentials', 401);
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) throw new AppError('Invalid credentials', 401);
@@ -34,7 +36,10 @@ export const login = async (body, req) => {
     userOverride: user,
   });
 
-  return { token, user };
+  const safeUser = user.toObject();
+  delete safeUser.password;
+
+  return { token, user: safeUser };
 };
 
 export const getMe = async (userId) => authRepo.findByIdWithInstitute(userId);

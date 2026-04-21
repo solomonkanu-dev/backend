@@ -40,7 +40,7 @@ export const sendTestEmail = async (instituteId, testEmail, userId) => {
   let errorMsg = null;
 
   try {
-    await sendTestEmailDirect({ instituteName, toEmail: testEmail });
+    await sendTestEmailDirect({ instituteId, instituteName, toEmail: testEmail });
   } catch (err) {
     status = 'failed';
     errorMsg = err?.message ?? String(err);

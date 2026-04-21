@@ -1,7 +1,8 @@
 /**
  * Email notification utility — fire-and-forget, never throws.
- * Uses Resend (https://resend.com) as the email transport.
+ * Uses Nodemailer with per-institute SMTP settings as the email transport.
  */
+import nodemailer from 'nodemailer';
 
 // ─── HTML shell ───────────────────────────────────────────────────────────────
 
@@ -172,34 +173,40 @@ export function buildEmail(type, instituteName, data) {
   }
 }
 
-// ─── Resend client (singleton) ────────────────────────────────────────────────
+// ─── Nodemailer transporter factory ──────────────────────────────────────────
 
-let _resend = null;
-async function getResend() {
-  if (!_resend) {
-    const { Resend } = await import('resend');
-    _resend = new Resend(process.env.RESEND_API_KEY);
-  }
-  return _resend;
+function createTransporter(smtp) {
+  return nodemailer.createTransport({
+    host: smtp.host,
+    port: smtp.port ?? 587,
+    secure: smtp.secure ?? false,
+    auth: {
+      user: smtp.user,
+      // App Passwords are displayed with spaces — strip them
+      pass: smtp.pass?.replace(/\s/g, ''),
+    },
+  });
 }
 
 // ─── Core send function ───────────────────────────────────────────────────────
 
 /**
- * Fire-and-forget email sender via Resend.
+ * Fire-and-forget email sender via Nodemailer (per-institute SMTP).
  * @param {{ instituteId: string, type: string, recipientId?: string, recipientEmail: string, instituteName: string, data: Record<string, any> }} opts
  */
 export async function sendEmailNotification({ instituteId, type, recipientId, recipientEmail, instituteName, data }) {
   try {
     if (!recipientEmail) return;
-    if (!process.env.RESEND_API_KEY) {
-      console.warn('[email] RESEND_API_KEY not configured — skipping email');
-      return;
-    }
 
     // Lazy-load models to avoid circular dependencies at startup
     const { default: NotificationSettings } = await import('../models/NotificationSettings.js');
     const settings = await NotificationSettings.findOne({ institute: instituteId }).lean();
+
+    const smtp = settings?.smtp;
+    if (!smtp?.host || !smtp?.user || !smtp?.pass) {
+      console.warn('[email] SMTP not configured for institute — skipping email');
+      return;
+    }
 
     // Check if this notification type is enabled
     if (type !== 'test' && settings?.enabled?.[type] === false) return;
@@ -213,19 +220,20 @@ export async function sendEmailNotification({ instituteId, type, recipientId, re
     }
 
     const { subject: emailSubject, html } = buildEmail(type, instituteName, data ?? {});
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@edupulse.com';
-    const from = `${instituteName} <${fromEmail}>`;
+    const fromName = smtp.fromName || instituteName;
+    const fromEmail = smtp.fromEmail || smtp.user;
+    const from = `${fromName} <${fromEmail}>`;
 
     let status = 'sent';
     let errorMsg = null;
 
     try {
-      const resend = await getResend();
-      await resend.emails.send({ from, to: [recipientEmail], subject: emailSubject, html });
+      const transporter = createTransporter(smtp);
+      await transporter.sendMail({ from, to: recipientEmail, subject: emailSubject, html });
     } catch (sendErr) {
       status = 'failed';
       errorMsg = sendErr?.message ?? String(sendErr);
-      console.error('[email] Resend send error:', errorMsg);
+      console.error('[email] Nodemailer send error:', errorMsg);
     }
 
     // Log the attempt — best-effort, never throws
@@ -252,23 +260,26 @@ export async function sendEmailNotification({ instituteId, type, recipientId, re
 // ─── Test email (used by settings controller) ─────────────────────────────────
 
 /**
- * Sends a test email via Resend.
+ * Sends a test email via Nodemailer using the institute's SMTP settings.
  * Returns { ok: true } or throws so the controller can surface the error.
  */
-export async function sendTestEmailDirect({ instituteName, toEmail }) {
-  if (!process.env.RESEND_API_KEY) {
-    throw new Error('RESEND_API_KEY is not configured on the server');
+export async function sendTestEmailDirect({ instituteId, instituteName, toEmail }) {
+  const { default: NotificationSettings } = await import('../models/NotificationSettings.js');
+  const settings = await NotificationSettings.findOne({ institute: instituteId }).lean();
+
+  const smtp = settings?.smtp;
+  if (!smtp?.host || !smtp?.user || !smtp?.pass) {
+    throw new Error('SMTP is not configured. Please set up your SMTP settings first.');
   }
 
-  const { Resend } = await import('resend');
-  const resend = new Resend(process.env.RESEND_API_KEY);
-
   const { subject, html } = buildEmail('test', instituteName, {});
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'noreply@edupulse.com';
+  const fromName = smtp.fromName || instituteName;
+  const fromEmail = smtp.fromEmail || smtp.user;
 
-  await resend.emails.send({
-    from: `${instituteName} <${fromEmail}>`,
-    to: [toEmail],
+  const transporter = createTransporter(smtp);
+  await transporter.sendMail({
+    from: `${fromName} <${fromEmail}>`,
+    to: toEmail,
     subject,
     html,
   });

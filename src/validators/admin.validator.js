@@ -3,7 +3,7 @@ import { body, param, validationResult } from 'express-validator';
 export const requestAdminSignupRules = [
   body('fullName').notEmpty().withMessage('Full name required'),
   body('email').isEmail().withMessage('Valid email required'),
-  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  body('password').isLength({ min: 7 }).withMessage('Password must be at least 7 characters'),
 ];
 
 export const createStudentRules = [
