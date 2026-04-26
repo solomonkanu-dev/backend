@@ -5,6 +5,7 @@ import {
   exportFeeCollection,
   exportSalaryReport,
   exportAttendanceSummary,
+  exportFinancialRecords,
 } from '../controllers/export.controller.js';
 import auth from '../middlewares/auth.js';
 import { adminOrSuperAdmin } from '../middlewares/adminOrSuperAdmin.js';
@@ -17,5 +18,6 @@ router.get('/lecturers',          auth, adminOrSuperAdmin, exportLecturerList);
 router.get('/fee-collection',     auth, adminOrSuperAdmin, exportFeeCollection);
 router.get('/salary',             auth, superAdminOnly,    exportSalaryReport);
 router.get('/attendance-summary', auth, adminOrSuperAdmin, exportAttendanceSummary);
+router.get('/financial', auth, adminOrSuperAdmin, exportFinancialRecords);
 
 export default router;

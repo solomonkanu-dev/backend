@@ -30,7 +30,7 @@ export const findStudentWithPromotion = (studentId) =>
     .lean();
 
 export const findStudentFees = (filter) =>
-  StudentFee.find(filter).populate('fees.fee', 'title amount').lean();
+  StudentFee.find(filter).lean();
 
 export const findAnnouncements = (instituteId) =>
   Announcement.find({

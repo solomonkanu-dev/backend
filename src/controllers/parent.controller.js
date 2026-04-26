@@ -65,3 +65,12 @@ export const getAnnouncements = async (req, res, next) => {
     next(err);
   }
 };
+
+export const getChildAttendanceStats = async (req, res, next) => {
+  try {
+    const data = await parentService.getChildAttendanceStats(req.params.studentId, req.user);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};

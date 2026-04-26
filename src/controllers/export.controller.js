@@ -1,4 +1,5 @@
 import * as exportService from '../services/export.service.js';
+import * as financialService from '../services/financial.service.js';
 import { sendCsv } from '../utils/csvExport.js';
 
 export const exportStudentList = async (req, res, next) => {
@@ -45,6 +46,15 @@ export const exportAttendanceSummary = async (req, res, next) => {
     const instituteId = exportService.getInstituteId(req.user, req.query.instituteId);
     const data = await exportService.getAttendanceSummaryData(instituteId);
     sendCsv(res, 'attendance-summary.csv', ['studentName', 'studentEmail', 'className', 'totalDays', 'presentDays', 'percentage'], data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const exportFinancialRecords = async (req, res, next) => {
+  try {
+    const data = await financialService.getFinancialExportData(req.user);
+    sendCsv(res, 'financial-records.csv', ['date', 'type', 'category', 'description', 'amount', 'paymentMethod', 'reference', 'term', 'recordedBy'], data);
   } catch (err) {
     next(err);
   }

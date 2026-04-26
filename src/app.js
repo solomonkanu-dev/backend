@@ -40,6 +40,8 @@ import timetableRoutes from "./routes/timetable.route.js";
 import calendarRoutes from "./routes/calendar.route.js";
 import chatRoutes from "./routes/chat.route.js";
 import examRoutes from "./routes/exam.route.js";
+import galleryRoutes from "./routes/gallery.route.js";
+import financialRoutes from "./routes/financial.route.js";
 import { maintenanceCheck } from "./middlewares/maintenanceCheck.js";
 
 const app = express();
@@ -147,6 +149,8 @@ app.use("/api/v1/timetable", timetableRoutes);
 app.use("/api/v1/calendar", calendarRoutes);
 app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/exam", examRoutes);
+app.use("/api/v1/gallery", galleryRoutes);
+app.use("/api/v1/financial", financialRoutes);
 
 // Error handler (last)
 app.use(errorHandler);

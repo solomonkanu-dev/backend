@@ -6,6 +6,7 @@ import Institute from '../models/Institute.js';
 import { AppError } from '../errors/AppError.js';
 import { sendEmailNotification } from '../utils/email.js';
 import { sendSmsNotification } from '../utils/sms.js';
+import { notify } from '../utils/notify.js';
 
 export const getStudentsForAttendance = async (classId, user) => {
   if (!classId) throw new AppError('classId is required', 400);
@@ -63,18 +64,71 @@ async function checkAndSendAttendanceAlerts(attendanceDoc, requestingUser) {
     const instituteName = institute?.name ?? 'Institution';
     const classId = attendanceDoc.class;
 
+    // Resolve class name once for all notifications
+    const classDoc = await Class.findById(classId).select('name').lean();
+    const className = classDoc?.name ?? null;
+
     await Promise.allSettled(
       absentStudentIds.map(async (studentId) => {
         try {
+          const student = await User.findById(studentId)
+            .select('fullName email studentProfile')
+            .lean();
+          if (!student) return;
+
+          // ── 1. Notify parents (every absence) ───────────────────────────────
+          const parents = await User.find({
+            linkedStudents: studentId,
+            role: 'parent',
+            isActive: true,
+          }).select('_id fullName phoneNumber email').lean();
+
+          const absenceData = {
+            studentName: student.fullName,
+            date: attendanceDoc.date,
+            className,
+          };
+          const absenceMeta = {
+            instituteId,
+            type: 'absenceAlert',
+            instituteName,
+            data: absenceData,
+          };
+
+          const parentNotifMessage = `${student.fullName} was marked absent${className ? ` from ${className}` : ''} on ${new Date(attendanceDoc.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}.`;
+
+          await Promise.allSettled(
+            parents.map(async (parent) => {
+              // In-app notification
+              notify({
+                recipientId: String(parent._id),
+                instituteId: String(instituteId),
+                type: 'absenceAlert',
+                title: `Absence Alert — ${student.fullName}`,
+                message: parentNotifMessage,
+                relatedEntity: { studentId: String(studentId), date: attendanceDoc.date },
+              }).catch(() => {});
+
+              // SMS to parent's phone number
+              if (parent.phoneNumber) {
+                sendSmsNotification({ ...absenceMeta, recipientId: String(parent._id), recipientPhone: parent.phoneNumber }).catch(() => {});
+              }
+            })
+          );
+
+          // Also SMS the student's guardian phone (from studentProfile)
+          const guardianPhone = student.studentProfile?.guardian?.guardianPhone;
+          if (guardianPhone) {
+            sendSmsNotification({ ...absenceMeta, recipientId: String(studentId), recipientPhone: guardianPhone }).catch(() => {});
+          }
+
+          // ── 2. Low-attendance alert to student (< 75%, existing logic) ──────
           const stats = await repo.aggregateStudentStats(classId, studentId);
           if (!stats.length || stats[0].total === 0) return;
 
           const { total, present } = stats[0];
           const rate = Number(((present / total) * 100).toFixed(1));
           if (rate >= 75) return;
-
-          const student = await User.findById(studentId).select('fullName email studentProfile').lean();
-          if (!student) return;
 
           const notifData = { studentName: student.fullName, rate, totalClasses: total };
           const notifMeta = { instituteId, type: 'attendanceAlert', recipientId: studentId, instituteName, data: notifData };

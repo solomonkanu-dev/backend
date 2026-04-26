@@ -34,6 +34,13 @@ export const uploadDocument = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 }).single("file");
 
+// For gallery uploads — images only, 5 MB each, up to 20 at once
+export const uploadImages = multer({
+  storage,
+  fileFilter: imageFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).array("photos", 20);
+
 // Uniform multer error handler — use after the multer middleware
 export const handleMulterError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {

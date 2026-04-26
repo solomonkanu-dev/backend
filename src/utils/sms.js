@@ -32,6 +32,11 @@ export function buildSmsText(type, instituteName, data) {
       const { studentName, rate } = data;
       return `${tag} Attendance alert for ${studentName}: ${rate}% (minimum 75%). Please attend classes regularly.`;
     }
+    case 'absenceAlert': {
+      const { studentName, date, className } = data;
+      const dateStr = date ? new Date(date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'today';
+      return `${tag} Your child ${studentName} was marked ABSENT${className ? ` from ${className}` : ''} on ${dateStr}. Please contact the school if this is unexpected.`;
+    }
     case 'announcement': {
       const { title, body } = data;
       const snippet = body?.length > 100 ? `${body.slice(0, 100)}…` : (body ?? '');

@@ -4,6 +4,7 @@ import { parentOnly } from "../middlewares/parentOnly.js";
 import {
   getMyChildren,
   getChildAttendance,
+  getChildAttendanceStats,
   getChildResults,
   getChildFees,
   getAnnouncements,
@@ -14,6 +15,7 @@ const router = Router();
 
 router.get("/my-children", auth, parentOnly, getMyChildren);
 router.get("/child/:studentId/attendance", auth, parentOnly, getChildAttendance);
+router.get("/child/:studentId/attendance-stats", auth, parentOnly, getChildAttendanceStats);
 router.get("/child/:studentId/results", auth, parentOnly, getChildResults);
 router.get("/child/:studentId/fees", auth, parentOnly, getChildFees);
 router.get("/announcements", auth, parentOnly, getAnnouncements);

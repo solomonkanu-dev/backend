@@ -53,14 +53,22 @@ async function notifyAnnouncementByEmail(announcement, requestingUser) {
 
 export const createAnnouncement = async (body, req) => {
   const { user } = req;
-  const { title, body: announcementBody, type, targetRoles, institute, expiresAt } = body;
+  const { title, body: announcementBody, targetRoles, expiresAt } = body;
+  let { type, institute } = body;
 
   if (!title || !announcementBody) {
     throw new AppError('title and body are required', 400);
   }
 
-  if (type === 'institute_specific' && !institute) {
-    throw new AppError('institute is required for institute_specific announcements', 400);
+  // Admins can only create institute-specific announcements for their own institute
+  if (user.role === 'admin') {
+    type = 'institute_specific';
+    institute = user.institute?._id || user.institute;
+    if (!institute) throw new AppError('Admin account has no associated institute', 400);
+  } else {
+    if (type === 'institute_specific' && !institute) {
+      throw new AppError('institute is required for institute_specific announcements', 400);
+    }
   }
 
   const announcement = await announcementRepo.create({
@@ -141,10 +149,20 @@ export const markAsRead = async (id, user) => {
 };
 
 export const updateAnnouncement = async (id, body, req) => {
+  const { user } = req;
   const { title, body: announcementBody, isActive, expiresAt } = body;
 
   const existing = await announcementRepo.findById(id);
   if (!existing) throw new AppError('Announcement not found', 404);
+
+  // Admins can only edit announcements they created for their own institute
+  if (user.role === 'admin') {
+    const adminInstituteId = String(user.institute?._id || user.institute);
+    const announcementInstituteId = String(existing.institute ?? '');
+    if (String(existing.createdBy) !== String(user._id) || announcementInstituteId !== adminInstituteId) {
+      throw new AppError('You can only edit announcements you created for your institute', 403);
+    }
+  }
   const beforeAnnouncement = { title: existing.title, body: existing.body, isActive: existing.isActive, expiresAt: existing.expiresAt ?? null };
 
   const announcement = await announcementRepo.findByIdAndUpdate(id, {
@@ -170,6 +188,19 @@ export const updateAnnouncement = async (id, body, req) => {
 };
 
 export const deleteAnnouncement = async (id, req) => {
+  const { user } = req;
+
+  // Admins can only delete announcements they created for their own institute
+  if (user.role === 'admin') {
+    const existing = await announcementRepo.findById(id);
+    if (!existing) throw new AppError('Announcement not found', 404);
+    const adminInstituteId = String(user.institute?._id || user.institute);
+    const announcementInstituteId = String(existing.institute ?? '');
+    if (String(existing.createdBy) !== String(user._id) || announcementInstituteId !== adminInstituteId) {
+      throw new AppError('You can only delete announcements you created for your institute', 403);
+    }
+  }
+
   const announcement = await announcementRepo.findByIdAndDelete(id);
   if (!announcement) throw new AppError('Announcement not found', 404);
 
@@ -182,9 +213,14 @@ export const deleteAnnouncement = async (id, req) => {
   });
 };
 
-export const getAnnouncementReadStatus = async (id) => {
+export const getAnnouncementReadStatus = async (id, user) => {
   const announcement = await announcementRepo.findByIdWithReadBy(id);
   if (!announcement) throw new AppError('Announcement not found', 404);
+
+  // Admins can only view read status for announcements they created
+  if (user.role === 'admin' && String(announcement.createdBy) !== String(user._id)) {
+    throw new AppError('You can only view read status for announcements you created', 403);
+  }
 
   return { total: announcement.readBy.length, readBy: announcement.readBy };
 };

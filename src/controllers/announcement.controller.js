@@ -47,7 +47,7 @@ export const deleteAnnouncement = async (req, res, next) => {
 
 export const getAnnouncementReadStatus = async (req, res, next) => {
   try {
-    const data = await announcementService.getAnnouncementReadStatus(req.params.id);
+    const data = await announcementService.getAnnouncementReadStatus(req.params.id, req.user);
     res.json({ success: true, data });
   } catch (err) {
     next(err);

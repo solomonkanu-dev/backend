@@ -130,6 +130,9 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Phone number for parent accounts (also used as fallback for other roles)
+    phoneNumber: { type: String, default: null },
+
     linkedStudents: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", default: [] }],
 
     promotionHistory: [

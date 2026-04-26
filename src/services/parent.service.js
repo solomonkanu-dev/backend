@@ -95,7 +95,7 @@ export const getChildFees = async (studentId, user) => {
     status: sf.status,
     dueDate: sf.dueDate,
     items: (sf.fees ?? []).map((item) => ({
-      title: item.fee?.title ?? 'Fee',
+      title: item.label ?? 'Fee',
       amount: item.amount ?? 0,
       paid: item.paid ?? 0,
     })),
@@ -103,3 +103,41 @@ export const getChildFees = async (studentId, user) => {
 };
 
 export const getAnnouncements = (instituteId) => repo.findAnnouncements(instituteId);
+
+export const getChildAttendanceStats = async (studentId, user) => {
+  const linkedIds = user.linkedStudents.map(String);
+  if (!linkedIds.includes(String(studentId))) {
+    throw new AppError("Access denied to this student's data", 403);
+  }
+
+  const instituteId = user.institute?._id || user.institute;
+
+  const [todayRecord, monthlyAbsences] = await Promise.all([
+    repo.findTodayAttendanceForStudent(studentId, instituteId),
+    repo.aggregateAbsencesByMonth(studentId),
+  ]);
+
+  // Build a 12-month array with absence counts
+  const now = new Date();
+  const months = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const found = monthlyAbsences.find(
+      (m) => m._id.year === year && m._id.month === month
+    );
+    months.push({
+      year,
+      month,
+      label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      absences: found?.count ?? 0,
+    });
+  }
+
+  return {
+    todayStatus: todayRecord,
+    monthlyAbsences: months,
+    totalAbsencesThisYear: months.reduce((s, m) => s + m.absences, 0),
+  };
+};

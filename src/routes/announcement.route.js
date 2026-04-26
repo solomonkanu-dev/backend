@@ -8,16 +8,18 @@ import {
   deleteAnnouncement,
 } from '../controllers/announcement.controller.js';
 import auth from '../middlewares/auth.js';
-import superAdminOnly from '../middlewares/superAdmin.js';
+import { adminOrSuperAdmin } from '../middlewares/adminOrSuperAdmin.js';
 
 const router = Router();
 
 // Note: /:id/read and /:id/read-status defined before /:id to avoid conflicts
-router.post('/', auth, superAdminOnly, createAnnouncement);
+// Admins can create/manage announcements scoped to their own institute.
+// Super admins can manage all. Ownership checks are enforced in the service layer.
+router.post('/', auth, adminOrSuperAdmin, createAnnouncement);
 router.get('/', auth, getAnnouncements);
 router.post('/:id/read', auth, markAsRead);
-router.get('/:id/read-status', auth, superAdminOnly, getAnnouncementReadStatus);
-router.patch('/:id', auth, superAdminOnly, updateAnnouncement);
-router.delete('/:id', auth, superAdminOnly, deleteAnnouncement);
+router.get('/:id/read-status', auth, adminOrSuperAdmin, getAnnouncementReadStatus);
+router.patch('/:id', auth, adminOrSuperAdmin, updateAnnouncement);
+router.delete('/:id', auth, adminOrSuperAdmin, deleteAnnouncement);
 
 export default router;

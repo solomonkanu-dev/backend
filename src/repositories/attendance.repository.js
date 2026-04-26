@@ -251,3 +251,61 @@ export const aggregateEmployeeSummary = (employeeId, institute) =>
 
 export const countAttendance = (institute) =>
   Attendance.countDocuments({ institute });
+
+// ─── Parent-facing absence stats ─────────────────────────────────────────────
+
+/**
+ * Returns today's attendance record for a student (if any).
+ * Used by the parent dashboard to show same-day absence alerts.
+ */
+export const findTodayAttendanceForStudent = async (studentId, instituteId) => {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+
+  const doc = await Attendance.findOne({
+    institute: new mongoose.Types.ObjectId(instituteId),
+    date: { $gte: start, $lte: end },
+    'records.student': new mongoose.Types.ObjectId(studentId),
+  })
+    .populate('class', 'name')
+    .lean();
+
+  if (!doc) return null;
+
+  const record = doc.records.find(
+    (r) => r.student?.toString() === studentId.toString()
+  );
+
+  return {
+    date: doc.date,
+    status: record?.status ?? null,
+    className: doc.class?.name ?? null,
+  };
+};
+
+/**
+ * Aggregates absence counts grouped by calendar month for the last 12 months.
+ */
+export const aggregateAbsencesByMonth = (studentId) =>
+  Attendance.aggregate([
+    { $unwind: '$records' },
+    {
+      $match: {
+        'records.student': new mongoose.Types.ObjectId(studentId),
+        'records.status': 'absent',
+        date: { $gte: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) },
+      },
+    },
+    {
+      $group: {
+        _id: {
+          year: { $year: '$date' },
+          month: { $month: '$date' },
+        },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1 } },
+  ]);
