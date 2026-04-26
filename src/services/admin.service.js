@@ -676,7 +676,7 @@ export const bulkPromoteStudents = async ({ sourceClassId, targetClassId, studen
 
 // ─── Parent Management ────────────────────────────────────────────────────────
 
-export const createParent = async ({ fullName, email, password, linkedStudents = [] }, user) => {
+export const createParent = async ({ fullName, email, password, phoneNumber, linkedStudents = [] }, user) => {
   if (!fullName || !email || !password) throw new AppError('fullName, email, password required', 400);
 
   const instituteId = user.institute?._id || user.institute;
@@ -688,7 +688,11 @@ export const createParent = async ({ fullName, email, password, linkedStudents =
     if (students.length !== linkedStudents.length) throw new AppError('One or more students not found in this institute', 400);
   }
 
-  const parent = await repo.createUser({ fullName, email, password, role: 'parent', institute: instituteId, approved: true, isActive: true, linkedStudents });
+  const parent = await repo.createUser({
+    fullName, email, password, role: 'parent',
+    institute: instituteId, approved: true, isActive: true, linkedStudents,
+    ...(phoneNumber ? { phoneNumber } : {}),
+  });
   const { password: _, ...safe } = parent.toObject();
   return safe;
 };
