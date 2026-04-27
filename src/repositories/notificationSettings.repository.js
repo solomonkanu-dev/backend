@@ -1,5 +1,6 @@
 import NotificationSettings from '../models/NotificationSettings.js';
 import EmailLog from '../models/EmailLog.js';
+import SmsLog from '../models/SmsLog.js';
 
 export const findByInstitute = (instituteId) =>
   NotificationSettings.findOne({ institute: instituteId }).lean();
@@ -26,3 +27,16 @@ export const findEmailLogs = (instituteId, skip, limit) =>
 
 export const countEmailLogs = (instituteId) =>
   EmailLog.countDocuments({ institute: instituteId });
+
+export const createSmsLog = (data) => SmsLog.create(data).catch(() => {});
+
+export const findSmsLogs = (instituteId, skip, limit) =>
+  SmsLog.find({ institute: instituteId })
+    .sort({ sentAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .populate('recipientUser', 'fullName')
+    .lean();
+
+export const countSmsLogs = (instituteId) =>
+  SmsLog.countDocuments({ institute: instituteId });

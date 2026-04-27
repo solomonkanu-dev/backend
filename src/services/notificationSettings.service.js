@@ -63,9 +63,9 @@ export const sendTestEmail = async (instituteId, testEmail, userId) => {
   return testEmail;
 };
 
-export const sendTestSms = async (testPhone) => {
+export const sendTestSms = async (testPhone, instituteId) => {
   if (!testPhone) throw new AppError('testPhone is required', 400);
-  await sendTestSmsDirect(testPhone);
+  await sendTestSmsDirect(testPhone, instituteId);
   return testPhone;
 };
 
@@ -77,6 +77,19 @@ export const getEmailLogs = async (instituteId, pageParam) => {
   const [logs, total] = await Promise.all([
     repo.findEmailLogs(instituteId, skip, limit),
     repo.countEmailLogs(instituteId),
+  ]);
+
+  return { logs, total, page, pages: Math.ceil(total / limit) };
+};
+
+export const getSmsLogs = async (instituteId, pageParam) => {
+  const page = Math.max(1, parseInt(pageParam) || 1);
+  const limit = 10;
+  const skip = (page - 1) * limit;
+
+  const [logs, total] = await Promise.all([
+    repo.findSmsLogs(instituteId, skip, limit),
+    repo.countSmsLogs(instituteId),
   ]);
 
   return { logs, total, page, pages: Math.ceil(total / limit) };

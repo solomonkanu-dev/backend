@@ -4,10 +4,12 @@
  *   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER
  */
 
+import * as repo from '../repositories/notificationSettings.repository.js';
+
 // ─── Text builder ─────────────────────────────────────────────────────────────
 
 /**
- * @param {'feePayment'|'resultsPublished'|'announcement'|'assignmentPosted'|'attendanceAlert'|'test'} type
+ * @param {'feePayment'|'resultsPublished'|'announcement'|'assignmentPosted'|'attendanceAlert'|'absenceAlert'|'test'} type
  * @param {string} instituteName
  * @param {Record<string, any>} data
  * @returns {string}
@@ -52,9 +54,12 @@ export function buildSmsText(type, instituteName, data) {
 
 /**
  * Fire-and-forget SMS sender via Twilio.
- * @param {{ instituteId: string, type: string, recipientPhone?: string, instituteName: string, data: Record<string, any> }} opts
+ * @param {{ instituteId: string, type: string, recipientPhone?: string, recipientUserId?: string, instituteName: string, data: Record<string, any> }} opts
  */
-export async function sendSmsNotification({ instituteId, type, recipientPhone, instituteName, data }) {
+export async function sendSmsNotification({ instituteId, type, recipientPhone, recipientUserId, instituteName, data }) {
+  let status = 'sent';
+  let errorMsg = null;
+
   try {
     if (!recipientPhone) return;
 
@@ -84,8 +89,20 @@ export async function sendSmsNotification({ instituteId, type, recipientPhone, i
 
     console.info(`[sms] sent "${type}" to ${recipientPhone}`);
   } catch (err) {
-    console.error(`[sms] failed to send "${type}":`, err?.message ?? err);
+    status = 'failed';
+    errorMsg = err?.message ?? String(err);
+    console.error(`[sms] failed to send "${type}":`, errorMsg);
     // fire-and-forget — never re-throws
+  } finally {
+    repo.createSmsLog({
+      institute: instituteId,
+      recipientUser: recipientUserId ?? null,
+      recipientPhone,
+      type,
+      status,
+      error: errorMsg,
+      sentAt: new Date(),
+    });
   }
 }
 
@@ -95,7 +112,7 @@ export async function sendSmsNotification({ instituteId, type, recipientPhone, i
  * Sends a test SMS via Twilio.
  * Returns { ok: true } or throws so the controller can surface the error.
  */
-export async function sendTestSmsDirect(toPhone) {
+export async function sendTestSmsDirect(toPhone, instituteId) {
   const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER } = process.env;
   if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_FROM_NUMBER) {
     throw new Error('Twilio env vars (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER) are not configured on the server.');
@@ -104,10 +121,35 @@ export async function sendTestSmsDirect(toPhone) {
   const twilio = (await import('twilio')).default;
   const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 
-  await client.messages.create({
-    from: TWILIO_FROM_NUMBER,
-    to: toPhone,
-    body: 'Test SMS from EduPulse. Your SMS notifications are working correctly.',
+  let status = 'sent';
+  let errorMsg = null;
+
+  try {
+    await client.messages.create({
+      from: TWILIO_FROM_NUMBER,
+      to: toPhone,
+      body: 'Test SMS from EduPulse. Your SMS notifications are working correctly.',
+    });
+  } catch (err) {
+    status = 'failed';
+    errorMsg = err?.message ?? String(err);
+    repo.createSmsLog({
+      institute: instituteId ?? null,
+      recipientPhone: toPhone,
+      type: 'test',
+      status,
+      error: errorMsg,
+      sentAt: new Date(),
+    });
+    throw err;
+  }
+
+  repo.createSmsLog({
+    institute: instituteId ?? null,
+    recipientPhone: toPhone,
+    type: 'test',
+    status,
+    sentAt: new Date(),
   });
 
   return { ok: true };
