@@ -26,6 +26,8 @@ export const createInstituteRules = [
   body('country').optional(),
   body('email').optional().isEmail().withMessage('Invalid email'),
   body('logo').optional(),
+  body('founded').optional(),
+  body('mission').optional(),
 ];
 
 export const feesArrayRules = [

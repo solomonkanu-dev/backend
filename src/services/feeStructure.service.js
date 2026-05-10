@@ -4,6 +4,7 @@ import Class from '../models/Class.js';
 import User from '../models/user.js';
 import StudentFee from '../models/StudentFee.js';
 import { AppError } from '../errors/AppError.js';
+import { cacheGet, cacheSet, cacheDelPattern } from '../utils/cache.js';
 
 const computeTotal = (particulars = []) =>
   particulars.reduce((s, p) => s + (Number(p.amount) || 0), 0);
@@ -28,7 +29,7 @@ export const createFeeStructure = async ({ category, classId, studentId, particu
   const cleaned = particulars.map((p) => ({ label: String(p.label || '').trim(), amount: Number(p.amount || 0) }));
   const totalAmount = computeTotal(cleaned);
 
-  return repo.createFeeStructure({
+  const result = await repo.createFeeStructure({
     category,
     classId: classId || undefined,
     studentId: studentId || undefined,
@@ -37,6 +38,8 @@ export const createFeeStructure = async ({ category, classId, studentId, particu
     createdBy: user?._id,
     instituteId: instituteId || user?.institute?._id || user?.institute,
   });
+  await cacheDelPattern(`fees:struct:${instituteId || user?.institute?._id || user?.institute}:*`);
+  return result;
 };
 
 export const getFeeStructures = async (query, user) => {
@@ -54,6 +57,9 @@ export const getFeeStructures = async (query, user) => {
 
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const lim = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
+  const cacheKey = `fees:struct:${instituteId ?? 'all'}:${category ?? 'all'}:${classId ?? 'none'}:${studentId ?? 'none'}:p${pageNum}:l${lim}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) return cached;
 
   const [items, total] = await Promise.all([
     repo.findPaginated(q, (pageNum - 1) * lim, lim),
@@ -73,6 +79,7 @@ export const getFeeStructures = async (query, user) => {
     isAssigned: assignedSet.has(item._id.toString()),
   }));
 
+  await cacheSet(cacheKey, { data, meta: { page: pageNum, limit: lim, total } }, 300);
   return { data, meta: { page: pageNum, limit: lim, total } };
 };
 
@@ -112,6 +119,7 @@ export const updateFeeStructure = async (id, body) => {
   }
 
   await existing.save();
+  await cacheDelPattern(`fees:struct:${existing.instituteId}:*`);
   return existing;
 };
 
@@ -119,5 +127,6 @@ export const deleteFeeStructure = async (id) => {
   if (!mongoose.Types.ObjectId.isValid(id)) throw new AppError('Invalid id', 400);
   const deleted = await repo.deleteById(id);
   if (!deleted) throw new AppError('Not found', 404);
+  await cacheDelPattern(`fees:struct:${deleted.instituteId}:*`);
   return deleted;
 };

@@ -31,7 +31,7 @@ export const createUser = (data) => User.create(data);
 export const findUsersPaginated = (filter, skip, limit) => User.find(filter).skip(skip).limit(limit);
 
 export const findStudentsPaginated = (filter, skip, limit) =>
-  User.find(filter).skip(skip).limit(limit).populate('class', 'name');
+  User.find(filter).select('-password').skip(skip).limit(limit).populate('class', 'name').lean();
 
 export const countUsers = (filter) => User.countDocuments(filter);
 
@@ -91,7 +91,8 @@ export const findClassesPaginated = (filter, skip, limit) =>
     .skip(skip)
     .limit(limit)
     .populate('lecturer', 'fullName email')
-    .populate('students', 'fullName email studentProfile');
+    .populate('students', 'fullName email studentProfile')
+    .lean();
 
 export const countClasses = (filter) => Class.countDocuments(filter);
 

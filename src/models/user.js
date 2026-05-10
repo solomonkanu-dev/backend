@@ -154,6 +154,8 @@ const userSchema = new mongoose.Schema(
 
     emailOptOut: { type: [String], default: [] },
 
+    moduleAccess: { type: [String], default: [] },
+
     archivedAt: { type: Date, default: null },
     archiveNote: { type: String, default: '' },
 

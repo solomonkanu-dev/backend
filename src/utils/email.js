@@ -211,7 +211,8 @@ export async function sendEmailNotification({ instituteId, type, recipientId, re
       return;
     }
 
-    // Check if this notification type is enabled
+    // Check channel master switch, then per-type toggle
+    if (type !== 'test' && settings?.channels?.emailEnabled === false) return;
     if (type !== 'test' && settings?.enabled?.[type] === false) return;
 
     // Check user opt-out preference (only for non-critical types)

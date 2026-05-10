@@ -1,5 +1,6 @@
 import { AppError } from '../errors/AppError.js';
 import * as classRepo from '../repositories/class.repository.js';
+import { cacheDelPattern } from '../utils/cache.js';
 
 export const createClass = async (body, user) => {
   if (user.role !== 'admin') throw new AppError('Access denied', 403);
@@ -13,7 +14,9 @@ export const createClass = async (body, user) => {
   const lecturer = await classRepo.findLecturer(lecturerId, user.institute);
   if (!lecturer) throw new AppError('Lecturer not found', 404);
 
-  return classRepo.create({ name: trimmedName, lecturer: lecturer._id, institute: user.institute });
+  const newClass = await classRepo.create({ name: trimmedName, lecturer: lecturer._id, institute: user.institute });
+  await cacheDelPattern(`admin:classes:${user.institute?._id ?? user.institute}:*`);
+  return newClass;
 };
 
 export const addStudentToClass = async (body, user) => {
@@ -77,7 +80,9 @@ export const updateClass = async (classId, { name, lecturerId }, user) => {
     singleClass.lecturer = lecturer._id;
   }
 
-  return classRepo.save(singleClass);
+  const updated = await classRepo.save(singleClass);
+  await cacheDelPattern(`admin:classes:${user.institute?._id ?? user.institute}:*`);
+  return updated;
 };
 
 export const assignLecturerToClass = async (body, user) => {
@@ -92,7 +97,10 @@ export const assignLecturerToClass = async (body, user) => {
   if (!lecturer) throw new AppError('Lecturer not found', 404);
 
   singleClass.lecturer = lecturer._id;
-  return classRepo.save(singleClass);
+  const saved = await classRepo.save(singleClass);
+  const instId = singleClass.institute?._id ?? singleClass.institute ?? user.institute;
+  await cacheDelPattern(`admin:classes:${instId}:*`);
+  return saved;
 };
 
 export const getClassesWithSubjectSummary = async (user) => {

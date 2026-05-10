@@ -19,7 +19,7 @@ async function connectDB(uri) {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false, // Disable buffering for serverless
-      maxPoolSize: 10, // Maximum number of connections
+      maxPoolSize: 50, // Maximum number of connections
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
     };

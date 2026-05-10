@@ -18,6 +18,10 @@ const schema = new mongoose.Schema({
     assignmentPosted: { type: Boolean, default: true },
     attendanceAlert:  { type: Boolean, default: true },
   },
+  channels: {
+    smsEnabled:   { type: Boolean, default: true },
+    emailEnabled: { type: Boolean, default: true },
+  },
 }, { timestamps: true });
 
 export default mongoose.model('NotificationSettings', schema);

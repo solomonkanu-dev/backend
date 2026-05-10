@@ -29,6 +29,7 @@ import auditLogRoutes from "./routes/auditLog.route.js";
 import announcementRoutes from "./routes/announcement.route.js";
 import planRoutes from "./routes/plan.route.js";
 import systemConfigRoutes from "./routes/systemConfig.route.js";
+import instituteModulesRoutes from "./routes/instituteModules.route.js";
 import exportRoutes from "./routes/export.route.js";
 import notificationRoutes from "./routes/notification.route.js";
 import uploadRoutes from "./routes/upload.route.js";
@@ -81,12 +82,12 @@ const makeRateLimitStore = (prefix) => {
 };
 
 // General rate limiter — shared across all instances via Redis
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 600,
-  store: makeRateLimitStore('general'),
-});
-app.use(limiter);
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 600,
+//   store: makeRateLimitStore('general'),
+// });
+// app.use(limiter);
 
 // Stricter rate limiter for auth endpoints
 const authLimiter = rateLimit({
@@ -98,13 +99,13 @@ const authLimiter = rateLimit({
 app.use("/api/v1/auth", authLimiter);
 
 // Rate limiter for analytics endpoints (AI-driven, potentially expensive)
-const analyticsLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 150,
-  message: "Too many analytics requests, please slow down",
-  store: makeRateLimitStore('analytics'),
-});
-app.use("/api/v1/analytics", analyticsLimiter);
+// const analyticsLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 150,
+//   message: "Too many analytics requests, please slow down",
+//   store: makeRateLimitStore('analytics'),
+// });
+// app.use("/api/v1/analytics", analyticsLimiter);
 
 // Maintenance check — skip super-admin routes and health endpoint
 app.use((req, res, next) => {
@@ -140,6 +141,7 @@ app.use("/api/v1/announcements", announcementRoutes);
 app.use("/api/v1/plans", planRoutes);
 app.use("/api/v1/system", systemConfigRoutes);
 app.use("/api/v1/system-config", systemConfigRoutes);
+app.use("/api/v1", instituteModulesRoutes);
 app.use("/api/v1/exports", exportRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/upload", uploadRoutes);

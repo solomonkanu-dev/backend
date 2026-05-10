@@ -40,6 +40,7 @@ classSchema.index(
   { name: 1, institute: 1 },
   { unique: true }
 );
+classSchema.index({ institute: 1 });
 
 
 export default mongoose.model("Class", classSchema);

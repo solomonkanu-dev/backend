@@ -8,6 +8,7 @@ import { notify, notifySuperAdmins } from '../utils/notify.js';
 import User from '../models/user.js';
 import FeePayment from '../models/FeePayment.js';
 import Result from '../models/Result.js';
+import { cacheGet, cacheSet, cacheDel, cacheDelPattern } from '../utils/cache.js';
 
 // ─── Admin Signup ─────────────────────────────────────────────────────────────
 
@@ -71,19 +72,28 @@ export const createStudent = async ({ fullName, email, classId, studentProfile }
     relatedEntity: { entityType: 'User', entityId: student._id },
   });
 
+  await cacheDelPattern(`admin:students:${user.institute?._id ?? user.institute}:*`);
   return { student, tempPassword };
 };
 
 export const getAllStudents = async (query, user) => {
   const page = parseInt(query.page) || 1;
   const limit = Math.min(parseInt(query.limit) || 20, 100);
+  const instituteId = user.institute?._id ?? user.institute;
+  const cacheKey = `admin:students:${instituteId}:p${page}:l${limit}`;
+
+  const cached = await cacheGet(cacheKey);
+  if (cached) return cached;
+
   const skip = (page - 1) * limit;
   const filter = { role: 'student', institute: user.institute, archivedAt: null };
   const [data, total] = await Promise.all([
     repo.findStudentsPaginated(filter, skip, limit),
     repo.countUsers(filter),
   ]);
-  return { data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  const result = { data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  await cacheSet(cacheKey, result, 120);
+  return result;
 };
 
 export const getStudentById = async (studentId, user) => {
@@ -143,6 +153,7 @@ export const updateStudent = async (studentId, { fullName, email, classId, stude
     after: { fullName: student.fullName, email: student.email, class: student.class?.toString() ?? null },
     statusCode: 200,
   });
+  await cacheDelPattern(`admin:students:${req.user.institute?._id ?? req.user.institute}:*`);
   return updated;
 };
 
@@ -168,6 +179,7 @@ export const updateStudentLifecycle = async (studentId, { lifecycleStatus, lifec
     after: { lifecycleStatus, isActive: lifecycleStatus === 'active' },
     statusCode: 200,
   });
+  await cacheDelPattern(`admin:students:${req.user.institute?._id ?? req.user.institute}:*`);
   return student;
 };
 
@@ -189,19 +201,28 @@ export const createLecturer = async ({ fullName, email, lecturerProfile }, req) 
   });
 
   logAudit(req, { action: 'CREATE_LECTURER', entity: 'User', entityId: lecturer._id, description: `Created lecturer ${fullName} (${email})`, statusCode: 201 });
+  await cacheDelPattern(`admin:lecturers:${user.institute?._id ?? user.institute}:*`);
   return lecturer;
 };
 
 export const getAllLecturers = async (query, user) => {
   const page = parseInt(query.page) || 1;
   const limit = Math.min(parseInt(query.limit) || 20, 100);
+  const instituteId = user.institute?._id ?? user.institute;
+  const cacheKey = `admin:lecturers:${instituteId}:p${page}:l${limit}`;
+
+  const cached = await cacheGet(cacheKey);
+  if (cached) return cached;
+
   const skip = (page - 1) * limit;
   const filter = { role: 'lecturer', institute: user.institute, archivedAt: null };
   const [data, total] = await Promise.all([
     repo.findUsersPaginated(filter, skip, limit),
     repo.countUsers(filter),
   ]);
-  return { data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  const result = { data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  await cacheSet(cacheKey, result, 300);
+  return result;
 };
 
 export const getLecturerById = async (lecturerId, user) => {
@@ -271,6 +292,7 @@ export const updateLecturer = async (lecturerId, { fullName, email, lecturerProf
     after: { fullName: lecturer.fullName, email: lecturer.email },
     statusCode: 200,
   });
+  await cacheDelPattern(`admin:lecturers:${req.user.institute?._id ?? req.user.institute}:*`);
   return updated;
 };
 
@@ -300,6 +322,11 @@ export const suspendUser = async (userId, req) => {
   await user.save();
 
   logAudit(req, { action: 'SUSPEND_USER', entity: 'User', entityId: user._id, description: `Suspended ${user.role} ${user.fullName} (${user.email})`, before: { isActive: true }, after: { isActive: false }, statusCode: 200 });
+  const instId = req.user.institute?._id ?? req.user.institute;
+  await Promise.all([
+    cacheDelPattern(`admin:students:${instId}:*`),
+    cacheDelPattern(`admin:lecturers:${instId}:*`),
+  ]);
 };
 
 export const unsuspendUser = async (userId, req) => {
@@ -311,6 +338,11 @@ export const unsuspendUser = async (userId, req) => {
   await user.save();
 
   logAudit(req, { action: 'UNSUSPEND_USER', entity: 'User', entityId: user._id, description: `Unsuspended ${user.role} ${user.fullName} (${user.email})`, before: { isActive: false }, after: { isActive: true }, statusCode: 200 });
+  const instId = req.user.institute?._id ?? req.user.institute;
+  await Promise.all([
+    cacheDelPattern(`admin:students:${instId}:*`),
+    cacheDelPattern(`admin:lecturers:${instId}:*`),
+  ]);
 };
 
 export const deleteUser = async (userId, req) => {
@@ -320,6 +352,11 @@ export const deleteUser = async (userId, req) => {
   await user.deleteOne();
 
   logAudit(req, { action: 'DELETE_USER', entity: 'User', entityId: user._id, description: `Deleted ${user.role} ${user.fullName} (${user.email})`, statusCode: 200 });
+  const instId = req.user.institute?._id ?? req.user.institute;
+  await Promise.all([
+    cacheDelPattern(`admin:students:${instId}:*`),
+    cacheDelPattern(`admin:lecturers:${instId}:*`),
+  ]);
 };
 
 // ─── Institute ────────────────────────────────────────────────────────────────
@@ -342,13 +379,25 @@ export const createInstitute = async (body, req) => {
 };
 
 export const getMyInstitute = async (userId) => {
+  const cacheKey = `institute:admin:${userId}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) return cached;
+
   const institute = await repo.findInstituteByAdmin(userId);
   if (!institute) throw new AppError('Institute not found', 404);
+  await cacheSet(cacheKey, institute, 600);
   return institute;
 };
 
 export const updateInstitute = async (adminId, body) => {
   const institute = await repo.updateInstituteByAdmin(adminId, body);
+  if (!institute) throw new AppError('Institute not found', 404);
+  await cacheDel(`institute:admin:${adminId}`);
+  return institute;
+};
+
+export const getInstituteById = async (instituteId) => {
+  const institute = await repo.findInstituteById(instituteId);
   if (!institute) throw new AppError('Institute not found', 404);
   return institute;
 };
@@ -377,6 +426,12 @@ export const getClassWithStudents = (classId, user) => {
 export const getAllClasses = async (query, user) => {
   const page = parseInt(query.page) || 1;
   const limit = Math.min(parseInt(query.limit) || 20, 100);
+  const instituteId = user.institute?._id ?? user.institute;
+  const cacheKey = `admin:classes:${instituteId}:p${page}:l${limit}`;
+
+  const cached = await cacheGet(cacheKey);
+  if (cached) return cached;
+
   const skip = (page - 1) * limit;
   const filter = { institute: user.institute };
 
@@ -386,19 +441,20 @@ export const getAllClasses = async (query, user) => {
   ]);
 
   const data = classes.map((cls) => {
-    const classObj = cls.toObject();
-    const totalMale = classObj.students.filter((s) => s.studentProfile?.gender?.toLowerCase() === 'male').length;
-    const totalFemale = classObj.students.filter((s) => s.studentProfile?.gender?.toLowerCase() === 'female').length;
+    const totalMale = cls.students.filter((s) => s.studentProfile?.gender?.toLowerCase() === 'male').length;
+    const totalFemale = cls.students.filter((s) => s.studentProfile?.gender?.toLowerCase() === 'female').length;
     return {
-      ...classObj,
+      ...cls,
       totalMale,
       totalFemale,
-      totalStudents: classObj.students.length,
-      students: classObj.students.map((s) => ({ _id: s._id, fullName: s.fullName, email: s.email })),
+      totalStudents: cls.students.length,
+      students: cls.students.map((s) => ({ _id: s._id, fullName: s.fullName, email: s.email })),
     };
   });
 
-  return { data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  const result = { data, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  await cacheSet(cacheKey, result, 120);
+  return result;
 };
 
 export const getStudentsByClass = (user) => {
@@ -694,12 +750,20 @@ export const createParent = async ({ fullName, email, password, phoneNumber, lin
     ...(phoneNumber ? { phoneNumber } : {}),
   });
   const { password: _, ...safe } = parent.toObject();
+  await cacheDel(`admin:parents:${user.institute?._id ?? user.institute}`);
   return safe;
 };
 
-export const getParents = (user) => {
+export const getParents = async (user) => {
   const instituteId = user.institute?._id || user.institute;
-  return repo.findParents(instituteId);
+  const cacheKey = `admin:parents:${instituteId}`;
+
+  const cached = await cacheGet(cacheKey);
+  if (cached) return cached;
+
+  const data = await repo.findParents(instituteId);
+  await cacheSet(cacheKey, data, 120);
+  return data;
 };
 
 export const linkStudentToParent = async ({ parentId, studentId }, user) => {
@@ -715,6 +779,7 @@ export const linkStudentToParent = async ({ parentId, studentId }, user) => {
     parent.linkedStudents.push(studentId);
     await parent.save();
   }
+  await cacheDel(`admin:parents:${user.institute?._id ?? user.institute}`);
   return parent.linkedStudents;
 };
 
@@ -725,7 +790,32 @@ export const unlinkStudentFromParent = async ({ parentId, studentId }, user) => 
 
   parent.linkedStudents = parent.linkedStudents.filter((id) => String(id) !== String(studentId));
   await parent.save();
+  await cacheDel(`admin:parents:${user.institute?._id ?? user.institute}`);
   return parent.linkedStudents;
+};
+
+export const updateParent = async (parentId, { fullName, email, phoneNumber }, req) => {
+  const instituteId = req.user.institute?._id || req.user.institute;
+  const parent = await repo.findUserOne({ _id: parentId, institute: instituteId, role: 'parent' });
+  if (!parent) throw new AppError('Parent not found', 404);
+
+  if (fullName) parent.fullName = fullName;
+  if (email && email !== parent.email) {
+    const exists = await repo.findUserForEmailCheck(email, parentId);
+    if (exists) throw new AppError('Email already in use', 409);
+    parent.email = email;
+  }
+  if (phoneNumber !== undefined) parent.phoneNumber = phoneNumber;
+
+  await parent.save();
+
+  logAudit(req, {
+    action: 'UPDATE_PARENT', entity: 'User', entityId: parentId,
+    description: `Updated parent ${parent.fullName}`,
+    after: { fullName: parent.fullName, email: parent.email },
+    statusCode: 200,
+  });
+  return parent;
 };
 
 export const revokeParentAccess = async (parentId, user) => {

@@ -69,10 +69,11 @@ export async function sendSmsNotification({ instituteId, type, recipientPhone, r
       return;
     }
 
-    // Check enabled toggle for this type
+    // Check channel master switch and per-type toggle
     if (type !== 'test') {
       const { default: NotificationSettings } = await import('../models/NotificationSettings.js');
       const settings = await NotificationSettings.findOne({ institute: instituteId }).lean();
+      if (settings?.channels?.smsEnabled === false) return;
       if (settings?.enabled?.[type] === false) return;
     }
 

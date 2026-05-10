@@ -1,5 +1,6 @@
 import { AppError } from '../errors/AppError.js';
 import * as subjectRepo from '../repositories/subject.repository.js';
+import { cacheGet, cacheSet, cacheDel } from '../utils/cache.js';
 
 export const createSubjectForClass = async (body, user) => {
   if (!['admin', 'lecturer'].includes(user.role)) {
@@ -26,6 +27,7 @@ export const createSubjectForClass = async (body, user) => {
 
   await subjectRepo.addToClass(classId, subject._id);
 
+  await cacheDel(`subjects:${instituteId}`);
   return subject;
 };
 
@@ -35,8 +37,16 @@ export const getLecturerSubjects = async (user) =>
 export const getStudentSubjects = async (user) =>
   subjectRepo.findByClass(user.class);
 
-export const getSubjects = async (user) =>
-  subjectRepo.findByInstitute(user.institute);
+export const getSubjects = async (user) => {
+  const instituteId = user.institute?._id ?? user.institute;
+  const cacheKey = `subjects:${instituteId}`;
+  const cached = await cacheGet(cacheKey);
+  if (cached) return cached;
+
+  const data = await subjectRepo.findByInstitute(user.institute);
+  await cacheSet(cacheKey, data, 300);
+  return data;
+};
 
 export const getSubjectById = async (id) => {
   const subject = await subjectRepo.findById(id);
@@ -57,5 +67,7 @@ export const assignLecturerToSubject = async (body) => {
   }
 
   subject.lecturer = lecturerId;
-  return subjectRepo.save(subject);
+  const saved = await subjectRepo.save(subject);
+  await cacheDel(`subjects:${subject.institute?._id ?? subject.institute}`);
+  return saved;
 };

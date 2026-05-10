@@ -15,10 +15,10 @@ export const findByStudent = (studentId) =>
   Class.find({ students: studentId }).populate('lecturer', 'fullName');
 
 export const findByInstitute = (institute) =>
-  Class.find({ institute }).populate('lecturer', 'fullName').populate('students', 'fullName');
+  Class.find({ institute }).populate('lecturer', 'fullName').populate('students', 'fullName').lean();
 
 export const findByInstituteWithLecturer = (institute) =>
-  Class.find({ institute }).populate('lecturer', 'fullName email');
+  Class.find({ institute }).populate('lecturer', 'fullName email').lean();
 
 export const findByInstituteWithDetails = (filter, skip, limit) =>
   Class.find(filter)

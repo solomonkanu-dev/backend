@@ -236,6 +236,17 @@ export const updateInstitute = async (req, res, next) => {
   }
 };
 
+export const getInstituteProfile = async (req, res, next) => {
+  try {
+    const instituteId = req.user.institute?._id ?? req.user.institute;
+    if (!instituteId) return res.status(404).json({ message: 'No institute found for this account' });
+    const data = await adminService.getInstituteById(instituteId);
+    res.status(200).json({ statusCode: 200, success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const createFeeParticular = async (req, res, next) => {
   try {
     const result = await adminService.createFeeParticular(req.body, req.user);
@@ -369,6 +380,15 @@ export const createParent = async (req, res, next) => {
   try {
     const data = await adminService.createParent(req.body, req.user);
     res.status(201).json({ message: 'Parent account created', data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateParent = async (req, res, next) => {
+  try {
+    const data = await adminService.updateParent(req.params.parentId, req.body, req);
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }

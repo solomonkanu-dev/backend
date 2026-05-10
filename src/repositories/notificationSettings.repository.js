@@ -15,6 +15,8 @@ export const findOneAndUpdate = (instituteId, update) =>
     { new: true, upsert: true, runValidators: true }
   );
 
+export const findAll = () => NotificationSettings.find({}).lean();
+
 export const createEmailLog = (data) => EmailLog.create(data).catch(() => {});
 
 export const findEmailLogs = (instituteId, skip, limit) =>

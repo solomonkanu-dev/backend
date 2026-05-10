@@ -14,6 +14,7 @@ import {
   getStudentAssignments,
   getMyInstitute,
   updateInstitute,
+  getInstituteProfile,
   createFeeParticular,
   createStudent,
   createLecturer,
@@ -49,12 +50,14 @@ import {
   getCollectionTrend,
 } from "../controllers/feeAnalysis.controller.js";
 import { requestAdminSignupRules, createInstituteRules, feesArrayRules, assignFeeToStudentRules, resetPasswordRules, createStudentRules, createLecturerRules, validate } from "../validators/admin.validator.js";
-import { updateStudentLifecycle, getClassRankings, getReportCard, updateStudent, updateLecturer, createParent, getParents, linkStudentToParent, unlinkStudentFromParent, revokeParentAccess, restoreParentAccess, bulkPromoteStudents, getPromotionEligibility } from "../controllers/admin.controller.js";
+import { updateStudentLifecycle, getClassRankings, getReportCard, updateStudent, updateLecturer, createParent, getParents, updateParent, linkStudentToParent, unlinkStudentFromParent, revokeParentAccess, restoreParentAccess, bulkPromoteStudents, getPromotionEligibility } from "../controllers/admin.controller.js";
 import { recordPayment, getStudentPayments, getPaymentReceipt } from "../controllers/feePayment.controller.js";
 import { createOrUpdateTimetable, updateTimetable, deleteTimetable } from "../controllers/timetable.controller.js";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "../controllers/calendar.controller.js";
 import { getStudentQR, toggleStudentQR } from "../controllers/qr.attendance.controller.js";
 import { publishResults, unpublishResults, getResultPublishStatus } from "../controllers/admin.controller.js";
+import { bulkImportStudents } from "../controllers/bulkStudents.controller.js";
+import { bulkImportParents } from "../controllers/bulkParents.controller.js";
 
 const router = Router();
 
@@ -66,6 +69,7 @@ router.post("/admin-request", requestAdminSignupRules, validate, requestAdminSig
 router.patch("/profile", auth, updateMyProfile);
 
 router.post("/create-student", auth, adminOnly, enforcePlanLimits('students'), createStudentRules, validate, createStudent);
+router.post("/students/bulk-import", auth, adminOnly, bulkImportStudents);
 router.post("/create-lecturer", auth, adminOnly, enforcePlanLimits('lecturers'), createLecturerRules, validate, createLecturer);
 
 /**
@@ -142,6 +146,7 @@ router.patch("/results/publish", auth, adminOnly, publishResults);
 router.patch("/results/unpublish", auth, adminOnly, unpublishResults);
 router.get("/my-institute", auth, adminOnly, getMyInstitute);
 router.put("/my-institute/update", auth, adminOnly, updateInstitute);
+router.get("/institute-profile", auth, getInstituteProfile);
 router.post("/fees/assign/class", auth, adminOnly, assignFeesToClass);
 router.post("/result/assign-marks", auth, assignMarks);
 
@@ -194,9 +199,11 @@ router.get("/promote/preview/:classId", auth, adminOnly, async (req, res) => {
 
 // Parent management
 router.post("/parents", auth, adminOnly, createParent);
+router.post("/parents/bulk-import", auth, adminOnly, bulkImportParents);
 router.get("/parents", auth, adminOnly, getParents);
 router.post("/parents/link-student", auth, adminOnly, linkStudentToParent);
 router.post("/parents/unlink-student", auth, adminOnly, unlinkStudentFromParent);
+router.patch("/parents/:parentId", auth, adminOnly, updateParent);
 router.patch("/parents/:parentId/revoke", auth, adminOnly, revokeParentAccess);
 router.patch("/parents/:parentId/restore", auth, adminOnly, restoreParentAccess);
 

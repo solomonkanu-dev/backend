@@ -94,3 +94,28 @@ export const getSmsLogs = async (instituteId, pageParam) => {
 
   return { logs, total, page, pages: Math.ceil(total / limit) };
 };
+
+export const getAllInstituteChannelStates = async () => {
+  const [institutes, allSettings] = await Promise.all([
+    Institute.find({}).select('name email').lean(),
+    repo.findAll(),
+  ]);
+  const settingsMap = Object.fromEntries(allSettings.map((s) => [String(s.institute), s]));
+  return institutes.map((inst) => {
+    const s = settingsMap[String(inst._id)];
+    return {
+      instituteId: inst._id,
+      name: inst.name,
+      email: inst.email,
+      smsEnabled:   s?.channels?.smsEnabled  ?? true,
+      emailEnabled: s?.channels?.emailEnabled ?? true,
+    };
+  });
+};
+
+export const setInstituteChannels = async (instituteId, { smsEnabled, emailEnabled }) => {
+  const update = {};
+  if (smsEnabled   !== undefined) update['channels.smsEnabled']   = smsEnabled;
+  if (emailEnabled !== undefined) update['channels.emailEnabled'] = emailEnabled;
+  return repo.findOneAndUpdate(instituteId, update);
+};

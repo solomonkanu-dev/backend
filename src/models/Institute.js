@@ -67,6 +67,16 @@ const instituteSchema = new Schema(
       assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     },
 
+    founded: {
+      type: String,
+      default: '',
+    },
+
+    mission: {
+      type: String,
+      default: '',
+    },
+
     schoolType: {
       type: String,
       enum: ['primary', 'secondary'],
