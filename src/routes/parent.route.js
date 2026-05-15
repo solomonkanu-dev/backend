@@ -9,6 +9,8 @@ import {
   getChildFees,
   getAnnouncements,
   getChildPromotionHistory,
+  getChildPayments,
+  getChildPaymentReceipt,
 } from "../controllers/parent.controller.js";
 
 const router = Router();
@@ -20,5 +22,7 @@ router.get("/child/:studentId/results", auth, parentOnly, getChildResults);
 router.get("/child/:studentId/fees", auth, parentOnly, getChildFees);
 router.get("/announcements", auth, parentOnly, getAnnouncements);
 router.get("/child/:studentId/promotion-history", auth, parentOnly, getChildPromotionHistory);
+router.get("/child/:studentId/payments", auth, parentOnly, getChildPayments);
+router.get("/child/:studentId/payments/:paymentId/receipt", auth, parentOnly, getChildPaymentReceipt);
 
 export default router;

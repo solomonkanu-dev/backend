@@ -19,7 +19,8 @@ export const findByStudent = (studentId) =>
       select: 'title dueDate totalMarks status subject',
       populate: { path: 'subject', select: 'name code' },
     })
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
 
 export const findByIdWithAssignment = (id) =>
   Submission.findById(id).populate('assignment');

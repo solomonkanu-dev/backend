@@ -44,6 +44,7 @@ import examRoutes from "./routes/exam.route.js";
 import galleryRoutes from "./routes/gallery.route.js";
 import financialRoutes from "./routes/financial.route.js";
 import { maintenanceCheck } from "./middlewares/maintenanceCheck.js";
+import { csrfProtection } from "./middlewares/csrfProtection.js";
 
 const app = express();
 
@@ -82,30 +83,43 @@ const makeRateLimitStore = (prefix) => {
 };
 
 // General rate limiter — shared across all instances via Redis
-// const limiter = rateLimit({
-//   windowMs: 15 * 60 * 1000,
-//   max: 600,
-//   store: makeRateLimitStore('general'),
-// });
-// app.use(limiter);
+// General rate limiter — applies to every API request, shared across instances via Redis.
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many requests, please slow down",
+  store: makeRateLimitStore('general'),
+});
+app.use(limiter);
 
 // Stricter rate limiter for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: "Too many attempts, please try again later",
   store: makeRateLimitStore('auth'),
 });
 app.use("/api/v1/auth", authLimiter);
 
 // Rate limiter for analytics endpoints (AI-driven, potentially expensive)
-// const analyticsLimiter = rateLimit({
-//   windowMs: 15 * 60 * 1000,
-//   max: 150,
-//   message: "Too many analytics requests, please slow down",
-//   store: makeRateLimitStore('analytics'),
-// });
-// app.use("/api/v1/analytics", analyticsLimiter);
+const analyticsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 150,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many analytics requests, please slow down",
+  store: makeRateLimitStore('analytics'),
+});
+app.use("/api/v1/analytics", analyticsLimiter);
+
+// CSRF guard for cookie-authenticated mutations. JSON requests are protected
+// by the CORS preflight; this catches the multipart/urlencoded gap.
+// The Monime webhook is reachable because it carries no auth cookie.
+app.use(csrfProtection);
 
 // Maintenance check — skip super-admin routes and health endpoint
 app.use((req, res, next) => {

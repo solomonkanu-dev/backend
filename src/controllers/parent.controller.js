@@ -74,3 +74,25 @@ export const getChildAttendanceStats = async (req, res, next) => {
     next(err);
   }
 };
+
+export const getChildPayments = async (req, res, next) => {
+  try {
+    const data = await parentService.getChildPayments(req.params.studentId, req.user);
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getChildPaymentReceipt = async (req, res, next) => {
+  try {
+    const data = await parentService.getChildPaymentReceipt(
+      req.params.studentId,
+      req.params.paymentId,
+      req.user
+    );
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};

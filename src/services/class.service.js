@@ -46,7 +46,7 @@ export const getStudentClasses = async (user) =>
   classRepo.findByStudent(user.id);
 
 export const getInstituteClasses = async (user) =>
-  classRepo.findByInstitute(user.institute);
+  classRepo.findByInstituteWithLecturer(user.institute);
 
 export const getClasses = async (user) =>
   classRepo.findByInstituteWithLecturer(user.institute);

@@ -141,3 +141,38 @@ export const getChildAttendanceStats = async (studentId, user) => {
     totalAbsencesThisYear: months.reduce((s, m) => s + m.absences, 0),
   };
 };
+
+export const getChildPayments = async (studentId, user) => {
+  const linkedIds = user.linkedStudents.map(String);
+  if (!linkedIds.includes(String(studentId))) {
+    throw new AppError("Access denied to this student's data", 403);
+  }
+
+  const instituteId = user.institute?._id || user.institute;
+  const { findPaymentsByStudent } = await import('../repositories/feePayment.repository.js');
+  return findPaymentsByStudent(studentId, instituteId);
+};
+
+export const getChildPaymentReceipt = async (studentId, paymentId, user) => {
+  const linkedIds = user.linkedStudents.map(String);
+  if (!linkedIds.includes(String(studentId))) {
+    throw new AppError("Access denied to this student's data", 403);
+  }
+
+  const instituteId = user.institute?._id || user.institute;
+  const { findPaymentById } = await import('../repositories/feePayment.repository.js');
+  const { default: Institute } = await import('../models/Institute.js');
+  const { default: StudentFee } = await import('../models/StudentFee.js');
+
+  const payment = await findPaymentById(paymentId, instituteId);
+  if (!payment || String(payment.student?._id ?? payment.student) !== String(studentId)) {
+    throw new AppError('Receipt not found', 404);
+  }
+
+  const [institute, studentFee] = await Promise.all([
+    Institute.findById(instituteId).lean(),
+    StudentFee.findOne({ student: studentId, institute: instituteId }).lean(),
+  ]);
+
+  return { payment, institute, studentFee };
+};

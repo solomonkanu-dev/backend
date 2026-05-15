@@ -2,7 +2,7 @@ import * as accountService from '../services/account.service.js';
 
 export const createAccount = async (req, res, next) => {
   try {
-    const account = await accountService.createAccount({ role: req.user.role, institute: req.user.institute, ...req.body });
+    const account = await accountService.createAccount({ ...req.body, role: req.user.role, institute: req.user.institute });
     res.status(201).json({ message: 'Bank account created successfully', data: account });
   } catch (err) {
     next(err);
@@ -38,7 +38,7 @@ export const getAccountById = async (req, res, next) => {
 
 export const updateAccount = async (req, res, next) => {
   try {
-    const account = await accountService.updateAccount({ role: req.user.role, institute: req.user.institute, id: req.params.id, ...req.body });
+    const account = await accountService.updateAccount({ ...req.body, role: req.user.role, institute: req.user.institute, id: req.params.id });
     res.json({ message: 'Account updated successfully', data: account });
   } catch (err) {
     next(err);

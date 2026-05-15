@@ -2,7 +2,7 @@ import * as termService from '../services/academicTerm.service.js';
 
 export const createTerm = async (req, res, next) => {
   try {
-    const term = await termService.createTerm({ institute: req.user.institute, ...req.body });
+    const term = await termService.createTerm({ ...req.body, institute: req.user.institute });
     res.status(201).json({ message: 'Term created', data: term });
   } catch (err) {
     next(err);

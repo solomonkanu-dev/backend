@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { body, param, validationResult } from 'express-validator';
+import rateLimit from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
+import { getRedisClient } from '../config/redis.js';
 import {
   approveAdmin,
   deletePendingAdmin,
@@ -30,6 +33,26 @@ import superAdminOnly from '../middlewares/superAdmin.js';
 
 const router = Router();
 
+// Rate-limit the super-admin login — this is the highest-value credential in
+// the system, and it lives outside the /api/v1/auth prefix that the global
+// auth limiter is mounted on.
+const superAdminLoginStore = (() => {
+  const client = getRedisClient();
+  if (!client) return undefined;
+  return new RedisStore({
+    prefix: 'studman:rl:super-admin-login:',
+    sendCommand: (command, ...args) => client.call(command, ...args),
+  });
+})();
+const superAdminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many login attempts, please try again later',
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: superAdminLoginStore,
+});
+
 /**
  * Super Admin approves Admin signup request
  */
@@ -50,6 +73,7 @@ router.patch(
 
 router.post(
   '/super-admin/login',
+  superAdminLoginLimiter,
   [
     body('email').isEmail().withMessage('Valid email required'),
     body('password').notEmpty().withMessage('Password required'),

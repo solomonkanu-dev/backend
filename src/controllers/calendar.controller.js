@@ -11,7 +11,7 @@ export const getCalendarEvents = async (req, res, next) => {
 
 export const createCalendarEvent = async (req, res, next) => {
   try {
-    const event = await calendarService.createCalendarEvent({ institute: req.user.institute, ...req.body }, req.user._id);
+    const event = await calendarService.createCalendarEvent({ ...req.body, institute: req.user.institute }, req.user._id);
     res.status(201).json({ message: 'Event created', data: event });
   } catch (err) {
     next(err);

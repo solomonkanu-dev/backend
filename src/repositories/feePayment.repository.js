@@ -23,7 +23,7 @@ export const findStudentFee = (studentId, instituteId) =>
   StudentFee.findOne({ student: studentId, institute: instituteId });
 
 export const findStudentFeeById = (feeId) =>
-  StudentFee.findById(feeId).populate('fees.fee', 'title amount').lean();
+  StudentFee.findById(feeId).lean();
 
 export const findMyPayments = (studentId) =>
   FeePayment.find({ student: studentId })

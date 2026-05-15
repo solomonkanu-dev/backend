@@ -13,7 +13,7 @@ import { adminOnly } from '../middlewares/adminOnly.js';
 
 const router = Router();
 
-router.get('/maintenance', getMaintenanceStatus);
+router.get('/maintenance', auth, getMaintenanceStatus);
 router.patch('/maintenance/global', auth, superAdminOnly, toggleGlobalMaintenance);
 router.patch('/maintenance/institute', auth, superAdminOnly, toggleInstituteMaintenance);
 router.get('/maintenance/my-institute', auth, adminOnly, getMyInstituteMaintenanceStatus);

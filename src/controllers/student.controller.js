@@ -79,6 +79,15 @@ export const getMyPaymentReceipt = async (req, res, next) => {
   }
 };
 
+export const getMyFullReceipt = async (req, res, next) => {
+  try {
+    const data = await studentService.getMyFullReceipt(req.user);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getMyRanking = async (req, res, next) => {
   try {
     const data = await studentService.getMyRanking(req.user, req.query.termId);

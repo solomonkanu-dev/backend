@@ -73,23 +73,31 @@ export const handleWebhook = async (req, res) => {
   try {
     const rawBody = req.rawBody;
 
-    // Verify signature only if we captured the raw body and a signature header exists
     const hasSignatureHeader =
       req.headers['x-monime-signature'] ||
       req.headers['x-webhook-signature'] ||
       req.headers['monime-signature'];
 
-    if (rawBody && hasSignatureHeader) {
-      const isValid = monime.verifyWebhookSignature(rawBody, req);
-      if (!isValid) {
-        console.warn('[webhook] Invalid Monime signature — skipping event');
-        return;
-      }
+    // Signature is REQUIRED. Reject events that lack a raw body or signature header,
+    // or whose signature fails verification. This closes the path where an attacker
+    // POSTed a forged checkout_session.completed and got a plan activated for free.
+    if (!rawBody || !hasSignatureHeader) {
+      console.warn('[webhook] Missing raw body or signature header — rejecting');
+      return;
+    }
+    if (!monime.verifyWebhookSignature(rawBody, req)) {
+      console.warn('[webhook] Invalid Monime signature — rejecting');
+      return;
     }
 
-    // Use already-parsed req.body (Express JSON middleware parsed it)
     const event = req.body;
-    if (!event || !event.type) return;
+    if (!event || event.type !== 'checkout_session.completed') return;
+
+    const metadata = event?.data?.metadata;
+    if (!metadata || typeof metadata.planId !== 'string' || typeof metadata.instituteId !== 'string') {
+      console.warn('[webhook] Malformed metadata — rejecting');
+      return;
+    }
 
     await planService.handleWebhookEvent(event);
   } catch (err) {

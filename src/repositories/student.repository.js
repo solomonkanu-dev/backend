@@ -11,7 +11,7 @@ export const findAll = () => User.find({ role: 'student' }).populate('institute'
 export const findById = (id) => User.findById(id).populate('institute', 'name');
 
 export const findMyFees = (filter) =>
-  StudentFee.find(filter).populate('fees.fee', 'title').populate('class', 'name').lean();
+  StudentFee.find(filter).populate('class', 'name').lean();
 
 export const findMyResults = (filter) =>
   Result.find(filter)
@@ -42,8 +42,8 @@ export const findResultsForReportCard = (studentId, instituteId) =>
 export const findTermsByInstitute = (instituteId) =>
   AcademicTerm.find({ institute: instituteId }).sort({ startDate: 1 }).lean();
 
-export const findAllAttendance = (instituteId) =>
-  Attendance.find({ institute: instituteId }).lean();
+export const findStudentAttendance = (studentId, instituteId) =>
+  Attendance.find({ institute: instituteId, 'records.student': studentId }).lean();
 
 export const findClassResults = (classId, instituteId) =>
   Result.find({ class: classId, institute: instituteId }).lean();
@@ -53,13 +53,22 @@ export const findMyPayments = (studentId, instituteId) =>
 
 export const findPaymentReceipt = (paymentId, studentId, instituteId) =>
   FeePayment.findOne({ _id: paymentId, student: studentId, institute: instituteId })
-    .populate('student', 'fullName email profilePhoto studentProfile class')
+    .populate({
+      path: 'student',
+      select: 'fullName email profilePhoto studentProfile class',
+      populate: { path: 'class', select: 'name' },
+    })
     .populate('recordedBy', 'fullName')
     .lean();
 
 export const findStudentFeeOne = (studentId, instituteId) =>
   StudentFee.findOne({ student: studentId, institute: instituteId })
-    .populate('fees.fee', 'title')
+    .lean();
+
+export const findAllPaymentsForFullReceipt = (studentId, instituteId) =>
+  FeePayment.find({ student: studentId, institute: instituteId })
+    .populate('recordedBy', 'fullName')
+    .sort({ createdAt: 1 })
     .lean();
 
 export const findResultsForRanking = (classId, instituteId, termId) => {
