@@ -47,6 +47,18 @@ export const getChildPromotionHistory = async (req, res, next) => {
   }
 };
 
+export const getChildAssignments = async (req, res, next) => {
+  try {
+    const result = await parentService.getChildAssignments(
+      req.params.studentId,
+      req.user
+    );
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getChildFees = async (req, res, next) => {
   try {
     const data = await parentService.getChildFees(req.params.studentId, req.user);

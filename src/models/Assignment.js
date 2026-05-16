@@ -44,6 +44,14 @@ const assignmentSchema = new mongoose.Schema(
       enum: ["draft", "published"],
       default: "published",
     },
+    attachmentUrl: {
+      type: String,
+      default: "",
+    },
+    attachmentName: {
+      type: String,
+      default: "",
+    },
   },
   { timestamps: true }
 );

@@ -3,6 +3,7 @@ import {
   uploadProfilePhoto,
   getProfilePhoto,
   uploadInstituteLogo,
+  uploadReportCardAsset,
   uploadAssignmentFile,
 } from "../controllers/upload.controller.js";
 import auth from "../middlewares/auth.js";
@@ -16,6 +17,9 @@ router.get("/profile-photo", auth, getProfilePhoto);
 
 // Institute logo — admin only
 router.post("/institute-logo", auth, uploadImage, handleMulterError, uploadInstituteLogo);
+
+// Report card template assets (letterhead, watermark) — admin only
+router.post("/report-card-asset", auth, uploadImage, handleMulterError, uploadReportCardAsset);
 
 // Assignment file — student only (returns URL to use when submitting assignment)
 router.post("/assignment-file", auth, uploadDocument, handleMulterError, uploadAssignmentFile);

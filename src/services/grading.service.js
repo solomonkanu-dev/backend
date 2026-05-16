@@ -2,6 +2,34 @@ import { AppError } from '../errors/AppError.js';
 import * as gradingRepo from '../repositories/grading.repository.js';
 import mongoose from 'mongoose';
 
+// ─── Sierra Leone standard scale ──────────────────────────────────────────────
+
+/** Sierra Leone school letter scale — the standard default (pass mark 50%). */
+export const SIERRA_LEONE_GRADE_SCALE = [
+  { grade: 'A', minScore: 80, maxScore: 100, remark: 'Excellent' },
+  { grade: 'B', minScore: 70, maxScore: 79, remark: 'Very Good' },
+  { grade: 'C', minScore: 60, maxScore: 69, remark: 'Credit / Good' },
+  { grade: 'D', minScore: 50, maxScore: 59, remark: 'Pass' },
+  { grade: 'E', minScore: 40, maxScore: 49, remark: 'Weak Pass' },
+  { grade: 'F', minScore: 0, maxScore: 39, remark: 'Fail' },
+];
+
+/**
+ * Ensure an institute has a default grading scale; seeds the Sierra Leone
+ * standard scale when none exists. Returns the default scale.
+ */
+export const ensureDefaultGradingScale = async (instituteId, createdBy) => {
+  const existing = await gradingRepo.findDefaultByInstitute(instituteId);
+  if (existing) return existing;
+  return gradingRepo.create({
+    institute: instituteId,
+    name: 'Sierra Leone Standard',
+    grades: SIERRA_LEONE_GRADE_SCALE,
+    isDefault: true,
+    createdBy,
+  });
+};
+
 // ─── Utility exported for result.service.js ──────────────────────────────────
 
 /**
@@ -16,11 +44,12 @@ export const resolveGrade = async (instituteId, score) => {
     return entry ? entry.grade : 'F';
   }
 
-  // Built-in fallback
-  if (score >= 70) return 'A';
-  if (score >= 60) return 'B';
-  if (score >= 50) return 'C';
-  if (score >= 40) return 'D';
+  // Built-in fallback — Sierra Leone school letter scale (pass mark 50%)
+  if (score >= 80) return 'A';
+  if (score >= 70) return 'B';
+  if (score >= 60) return 'C';
+  if (score >= 50) return 'D';
+  if (score >= 40) return 'E';
   return 'F';
 };
 

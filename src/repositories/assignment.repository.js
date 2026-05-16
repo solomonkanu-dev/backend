@@ -38,3 +38,13 @@ export const findStudentsByClass = (classId, instituteId) =>
   User.find({ class: classId, institute: instituteId, role: 'student', isActive: true })
     .select('_id email fullName emailOptOut studentProfile')
     .lean();
+
+export const findParentsByStudentIds = (studentIds, instituteId) =>
+  User.find({
+    role: 'parent',
+    institute: instituteId,
+    isActive: true,
+    linkedStudents: { $in: studentIds },
+  })
+    .select('_id email fullName phoneNumber emailOptOut linkedStudents')
+    .lean();

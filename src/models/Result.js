@@ -4,6 +4,8 @@ const resultSchema = new mongoose.Schema(
   {
     student: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     subject: { type: mongoose.Schema.Types.ObjectId, ref: "Subject" },
+    caScore: Number,
+    examScore: Number,
     totalScore: Number,
     grade: String,
     institute: { type: mongoose.Schema.Types.ObjectId, ref: "Institute" },

@@ -50,7 +50,7 @@ import {
   getCollectionTrend,
 } from "../controllers/feeAnalysis.controller.js";
 import { requestAdminSignupRules, createInstituteRules, feesArrayRules, assignFeeToStudentRules, resetPasswordRules, createStudentRules, createLecturerRules, validate } from "../validators/admin.validator.js";
-import { updateStudentLifecycle, getClassRankings, getReportCard, updateStudent, updateLecturer, createParent, getParents, updateParent, linkStudentToParent, unlinkStudentFromParent, revokeParentAccess, restoreParentAccess, bulkPromoteStudents, getPromotionEligibility } from "../controllers/admin.controller.js";
+import { updateStudentLifecycle, getClassRankings, getReportCard, saveReportCardMeta, updateStudent, updateLecturer, createParent, getParents, updateParent, linkStudentToParent, unlinkStudentFromParent, revokeParentAccess, restoreParentAccess, bulkPromoteStudents, getPromotionEligibility } from "../controllers/admin.controller.js";
 import { recordPayment, getStudentPayments, getPaymentReceipt } from "../controllers/feePayment.controller.js";
 import { createOrUpdateTimetable, updateTimetable, deleteTimetable } from "../controllers/timetable.controller.js";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "../controllers/calendar.controller.js";
@@ -164,6 +164,7 @@ router.get("/fee-analysis/collection-trend", auth, adminOnly, getCollectionTrend
 
 // Report card
 router.get("/report-card/:studentId", auth, adminOnly, getReportCard);
+router.put("/report-card/:studentId/meta", auth, adminOnly, saveReportCardMeta);
 
 // Fee payments
 router.post("/fees/student/:studentId/payment", auth, adminOnly, recordPayment);

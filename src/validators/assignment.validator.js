@@ -7,6 +7,8 @@ export const createAssignmentRules = [
   body('dueDate').exists().withMessage('dueDate is required').bail().isISO8601().toDate().withMessage('Invalid due date'),
   body('totalMarks').optional().isNumeric().withMessage('totalMarks must be a number'),
   body('status').optional().isIn(['draft', 'published']).withMessage('status must be draft or published'),
+  body('attachmentUrl').optional().isString(),
+  body('attachmentName').optional().isString(),
 ];
 
 export const updateAssignmentRules = [
@@ -16,6 +18,8 @@ export const updateAssignmentRules = [
   body('dueDate').optional().isISO8601().toDate().withMessage('Invalid due date'),
   body('totalMarks').optional().isNumeric().withMessage('totalMarks must be a number'),
   body('status').optional().isIn(['draft', 'published']).withMessage('status must be draft or published'),
+  body('attachmentUrl').optional().isString(),
+  body('attachmentName').optional().isString(),
 ];
 
 export const assignmentIdParam = [param('id').isMongoId().withMessage('Invalid assignment ID')];

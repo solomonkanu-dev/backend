@@ -36,6 +36,16 @@ const subjectSchema = new mongoose.Schema(
       type: Number,
       default: 100,
     },
+
+    caTotal: {
+      type: Number,
+      default: 30,
+    },
+
+    examTotal: {
+      type: Number,
+      default: 70,
+    },
   },
   { timestamps: true }
 );

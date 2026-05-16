@@ -46,8 +46,28 @@ export const uploadInstituteLogo = async (file, user) => {
   return { logo: result.secure_url, institute };
 };
 
+export const uploadReportCardAsset = async (file, user) => {
+  if (user.role !== 'admin') throw new AppError('Only admins can upload report card assets', 403);
+  if (!file) throw new AppError('No file uploaded', 400);
+
+  const instituteId = user.institute?._id || user.institute;
+  if (!instituteId) throw new AppError('No institute associated with your account', 400);
+
+  const result = await uploadToCloudinary(file.buffer, {
+    folder: 'reportcard_templates',
+    transformation: [
+      { width: 1600, crop: 'limit' },
+      { quality: 'auto', fetch_format: 'auto' },
+    ],
+  });
+
+  return { url: result.secure_url };
+};
+
 export const uploadAssignmentFile = async (file, user) => {
-  if (user.role !== 'student') throw new AppError('Only students can upload assignment files', 403);
+  if (!['student', 'lecturer', 'admin'].includes(user.role)) {
+    throw new AppError('Not allowed to upload assignment files', 403);
+  }
   if (!file) throw new AppError('No file uploaded', 400);
 
   const isPdf = file.mimetype === 'application/pdf';
@@ -56,7 +76,7 @@ export const uploadAssignmentFile = async (file, user) => {
     file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
   const result = await uploadToCloudinary(file.buffer, {
-    folder: 'assignment_submissions',
+    folder: user.role === 'student' ? 'assignment_submissions' : 'assignment_files',
     resource_type: isPdf || isDoc ? 'raw' : 'image',
     ...(!(isPdf || isDoc) && { transformation: [{ quality: 'auto', fetch_format: 'auto' }] }),
   });

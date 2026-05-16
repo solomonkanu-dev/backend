@@ -35,6 +35,18 @@ export const uploadInstituteLogo = async (req, res, next) => {
   }
 };
 
+export const uploadReportCardAsset = async (req, res, next) => {
+  try {
+    const result = await uploadService.uploadReportCardAsset(req.file, req.user);
+    res.json({
+      message: 'Report card asset uploaded successfully',
+      url: result.url,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const uploadAssignmentFile = async (req, res, next) => {
   try {
     const result = await uploadService.uploadAssignmentFile(req.file, req.user);

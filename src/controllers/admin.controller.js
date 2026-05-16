@@ -136,7 +136,7 @@ export const getAllClasses = async (req, res, next) => {
 
 export const getStudentsByClass = async (req, res, next) => {
   try {
-    const data = await adminService.getStudentsByClass(req.user);
+    const data = await adminService.getStudentsByClass(req.params.classId, req.user);
     res.json(data);
   } catch (err) {
     next(err);
@@ -331,6 +331,15 @@ export const getReportCard = async (req, res, next) => {
   try {
     const data = await adminService.getReportCard(req.params.studentId, req.user, req.query.termId);
     res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const saveReportCardMeta = async (req, res, next) => {
+  try {
+    const data = await adminService.saveReportCardMeta(req.params.studentId, req.body, req);
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }

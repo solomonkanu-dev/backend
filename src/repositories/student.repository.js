@@ -15,7 +15,7 @@ export const findMyFees = (filter) =>
 
 export const findMyResults = (filter) =>
   Result.find(filter)
-    .populate('subject', 'name code totalMarks')
+    .populate('subject', 'name code totalMarks caTotal examTotal')
     .populate('class', 'name')
     .populate('term', 'name academicYear')
     .lean();
@@ -35,7 +35,7 @@ export const findInstituteById = (id) => Institute.findById(id).lean();
 
 export const findResultsForReportCard = (studentId, instituteId) =>
   Result.find({ student: studentId, institute: instituteId })
-    .populate('subject', 'name code totalMarks')
+    .populate('subject', 'name code totalMarks caTotal examTotal')
     .populate('term', 'name academicYear')
     .lean();
 

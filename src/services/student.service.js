@@ -2,6 +2,7 @@ import * as repo from '../repositories/student.repository.js';
 import User from '../models/user.js';
 import { AppError } from '../errors/AppError.js';
 import { cacheGet, cacheSet, cacheDel } from '../utils/cache.js';
+import { loadReportCardExtras } from './admin.service.js';
 
 export const getStudentDashboard = () => ({ message: 'User dashboard not yet implemented' });
 
@@ -61,13 +62,27 @@ export const getMyReportCard = async (user) => {
   ]);
 
   const totalClasses = attendanceRecords.length;
-  const presentCount = attendanceRecords.reduce((acc, record) => {
+  let presentCount = 0;
+  let absentCount = 0;
+  let lateCount = 0;
+  attendanceRecords.forEach((record) => {
     const entry = record.records?.find((r) => String(r.student) === String(studentId));
-    return acc + (entry?.status === 'present' ? 1 : 0);
-  }, 0);
-  const attendance = { present: presentCount, total: totalClasses, percentage: totalClasses > 0 ? Math.round((presentCount / totalClasses) * 100) : 0 };
+    if (!entry) return;
+    if (entry.status === 'present') presentCount += 1;
+    else if (entry.status === 'late') lateCount += 1;
+    else absentCount += 1;
+  });
+  const attendance = {
+    present: presentCount,
+    absent: absentCount,
+    late: lateCount,
+    total: totalClasses,
+    opened: totalClasses,
+    percentage: totalClasses > 0 ? Math.round((presentCount / totalClasses) * 100) : 0,
+  };
 
-  const classmates = await repo.findClassResults(student.class?._id ?? student.class, user.institute);
+  const classId = student.class?._id ?? student.class;
+  const classmates = await repo.findClassResults(classId, user.institute);
   const classTotals = {};
   classmates.forEach((r) => { const sid = String(r.student); classTotals[sid] = (classTotals[sid] ?? 0) + (r.marksObtained ?? 0); });
 
@@ -75,6 +90,28 @@ export const getMyReportCard = async (user) => {
   const outOf = Object.keys(classTotals).length;
   const higherCount = Object.values(classTotals).filter((t) => t > myTotal).length;
   const position = { rank: outOf > 0 ? higherCount + 1 : null, outOf };
+
+  const ageFromDob = (dob) => {
+    if (!dob) return null;
+    const diff = Date.now() - new Date(dob).getTime();
+    if (Number.isNaN(diff)) return null;
+    return Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+  };
+  const classmateProfiles = classId
+    ? await User.find({ class: classId, role: 'student' }).select('studentProfile.dateOfBirth').lean()
+    : [];
+  const ages = classmateProfiles
+    .map((u) => ageFromDob(u.studentProfile?.dateOfBirth))
+    .filter((a) => a != null);
+  const roll = {
+    numberOnRoll: classmateProfiles.length,
+    age: ageFromDob(student.studentProfile?.dateOfBirth),
+    averageAge: ages.length ? Math.round((ages.reduce((a, b) => a + b, 0) / ages.length) * 10) / 10 : null,
+    formTeacher: student.class?.lecturer?.fullName ?? null,
+  };
+
+  const instituteId = user.institute?._id || user.institute;
+  const extras = await loadReportCardExtras(instituteId, studentId, null);
 
   const reportCard = {
     student,
@@ -84,12 +121,16 @@ export const getMyReportCard = async (user) => {
       _id: r._id,
       subject: r.subject,
       term: r.term ? { _id: r.term._id, name: r.term.name, academicYear: r.term.academicYear } : null,
+      caScore: r.caScore,
+      examScore: r.examScore,
       marksObtained: r.marksObtained,
       totalScore: r.totalScore ?? 100,
       grade: r.grade,
     })),
     attendance,
     position,
+    roll,
+    ...extras,
     generatedAt: new Date(),
   };
 

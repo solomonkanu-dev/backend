@@ -9,11 +9,11 @@ export const findByClass = (classId, instituteId, termId) => {
   if (termId) filter.term = termId;
   return Result.find(filter)
     .populate('student', 'fullName email')
-    .populate('subject', 'name code totalMarks')
+    .populate('subject', 'name code totalMarks caTotal examTotal')
     .populate('term', 'name academicYear');
 };
 
 export const findBySubject = (subjectId, instituteId) =>
   Result.find({ subject: subjectId, institute: instituteId })
     .populate('student', 'fullName email')
-    .populate('subject', 'name totalMarks');
+    .populate('subject', 'name totalMarks caTotal examTotal');

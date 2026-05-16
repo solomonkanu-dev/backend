@@ -7,6 +7,8 @@
     "start": "cross-env NODE_ENV=production node src/server.js",
     "vercel-build": "echo 'Building for Vercel'",
     "seed:superadmin": "node scripts/seedSuperAdmin.js",
+    "seed:grading": "node scripts/seedGradingScales.js",
+    "seed:traits": "node scripts/seedRatingTraits.js",
     "dev": "nodemon --watch src --exec \"node --enable-source-maps src/server.js\"",
     "deploy": "vercel --prod",
     "lint": "eslint . --ext .js,.cjs,.mjs",
@@ -57,7 +59,7 @@
   },
   "devDependencies": {
     "@babel/preset-env": "^7.28.5",
-    "@flydotio/dockerfile": "^0.7.10",
+    "@flydotio/dockerfile": "^0.7.4",
     "@types/nodemailer": "^8.0.0",
     "babel-jest": "^30.2.0",
     "eslint": "^9.35.0",

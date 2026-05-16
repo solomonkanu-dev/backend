@@ -11,7 +11,7 @@ export const createSubjectForClass = async (body, user) => {
     throw new AppError('Institute required', 400);
   }
 
-  const { name, classId, lecturerId, totalMarks } = body;
+  const { name, classId, lecturerId, totalMarks, caTotal, examTotal } = body;
   const instituteId = user.institute?._id || user.institute;
 
   const classDoc = await subjectRepo.findClassById(classId, instituteId);
@@ -22,6 +22,8 @@ export const createSubjectForClass = async (body, user) => {
     class: classId,
     lecturer: lecturerId || null,
     totalMarks: totalMarks || 100,
+    caTotal: caTotal || 30,
+    examTotal: examTotal || 70,
     institute: instituteId,
   });
 

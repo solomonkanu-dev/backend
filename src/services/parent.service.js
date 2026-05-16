@@ -58,6 +58,20 @@ export const getChildResults = async (studentId, classId, user) => {
   return { data: results, classId: resolvedClassId ?? null };
 };
 
+export const getChildAssignments = async (studentId, user) => {
+  const linkedIds = user.linkedStudents.map(String);
+  if (!linkedIds.includes(String(studentId))) {
+    throw new AppError("Access denied to this student's data", 403);
+  }
+
+  const student = await repo.findStudentById(studentId);
+  if (!student?.class) return { data: [], classId: null };
+
+  const instituteId = user.institute?._id || user.institute;
+  const assignments = await repo.findAssignmentsForClass(student.class, instituteId);
+  return { data: assignments, classId: student.class };
+};
+
 export const getChildPromotionHistory = async (studentId, user) => {
   const linkedIds = user.linkedStudents.map(String);
   if (!linkedIds.includes(String(studentId))) {

@@ -18,7 +18,7 @@ export const assignMarks = async (body, req) => {
     throw new AppError('Access denied', 403);
   }
 
-  const { studentId, subjectId, classId, marksObtained, totalScore, termId } = body;
+  const { studentId, subjectId, classId, marksObtained, totalScore, caScore, examScore, termId } = body;
   const instituteId = user.institute?._id || user.institute;
 
   const student = await User.findOne({ _id: studentId, role: 'student', institute: instituteId }).select('+studentProfile');
@@ -31,15 +31,35 @@ export const assignMarks = async (body, req) => {
     throw new AppError('You are not assigned to this subject', 403);
   }
 
-  const effectiveTotalScore = totalScore ?? subject.totalMarks ?? 100;
+  // CA + Exam path when either component is supplied; otherwise the legacy
+  // single-mark path (kept so old data and old callers keep working).
+  const useCaExam = caScore !== undefined || examScore !== undefined;
+  let finalMarks;
+  let effectiveTotalScore;
+  let finalCa;
+  let finalExam;
 
-  if (marksObtained > effectiveTotalScore) {
-    throw new AppError(`Marks (${marksObtained}) exceed total (${effectiveTotalScore})`, 400);
+  if (useCaExam) {
+    const caTotal = subject.caTotal ?? 30;
+    const examTotal = subject.examTotal ?? 70;
+    finalCa = Number(caScore) || 0;
+    finalExam = Number(examScore) || 0;
+    if (finalCa < 0 || finalExam < 0) throw new AppError('Scores cannot be negative', 400);
+    if (finalCa > caTotal) throw new AppError(`CA score (${finalCa}) exceeds CA total (${caTotal})`, 400);
+    if (finalExam > examTotal) throw new AppError(`Exam score (${finalExam}) exceeds Exam total (${examTotal})`, 400);
+    finalMarks = finalCa + finalExam;
+    effectiveTotalScore = caTotal + examTotal;
+  } else {
+    effectiveTotalScore = totalScore ?? subject.totalMarks ?? 100;
+    if (marksObtained > effectiveTotalScore) {
+      throw new AppError(`Marks (${marksObtained}) exceed total (${effectiveTotalScore})`, 400);
+    }
+    finalMarks = marksObtained;
   }
 
   const percentage = effectiveTotalScore > 0
-    ? Math.round((marksObtained / effectiveTotalScore) * 100)
-    : marksObtained;
+    ? Math.round((finalMarks / effectiveTotalScore) * 100)
+    : finalMarks;
 
   const grade = await resolveGrade(instituteId, percentage);
 
@@ -55,18 +75,25 @@ export const assignMarks = async (body, req) => {
     ? { marksObtained: existing.marksObtained, grade: existing.grade, totalScore: existing.totalScore }
     : null;
 
+  const update = { marksObtained: finalMarks, totalScore: effectiveTotalScore, grade, institute: instituteId };
+  if (useCaExam) {
+    update.caScore = finalCa;
+    update.examScore = finalExam;
+  }
+
   const result = await resultRepo.findOneAndUpsert(
     { student: studentId, subject: subjectId, class: classId, term: resolvedTermId },
-    { marksObtained, totalScore: effectiveTotalScore, grade, institute: instituteId }
+    update
   );
 
+  const breakdown = useCaExam ? ` [CA ${finalCa} + Exam ${finalExam}]` : '';
   logAudit(req, {
     action: 'ASSIGN_MARKS',
     entity: 'Result',
     entityId: result._id,
-    description: `Assigned ${marksObtained}/${effectiveTotalScore} (${percentage}%, grade ${grade}) to student ${student.fullName} for subject ${subject.name}`,
+    description: `Assigned ${finalMarks}/${effectiveTotalScore}${breakdown} (${percentage}%, grade ${grade}) to student ${student.fullName} for subject ${subject.name}`,
     before: beforeMarks,
-    after: { marksObtained, totalScore: effectiveTotalScore, percentage, grade },
+    after: { marksObtained: finalMarks, caScore: finalCa, examScore: finalExam, totalScore: effectiveTotalScore, percentage, grade },
     statusCode: 200,
   });
 
@@ -76,7 +103,7 @@ export const assignMarks = async (body, req) => {
   const notifData = {
     studentName: student.fullName,
     subject: subject.name,
-    marksObtained,
+    marksObtained: finalMarks,
     totalMarks: effectiveTotalScore,
     grade: result.grade ?? 'N/A',
   };

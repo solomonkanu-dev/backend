@@ -137,20 +137,20 @@ export const findResultsByClass = (classId, instituteId, termId) => {
   if (termId) filter.term = termId;
   return Result.find(filter)
     .populate('student', 'fullName email profilePhoto')
-    .populate('subject', 'name code totalMarks')
+    .populate('subject', 'name code totalMarks caTotal examTotal')
     .populate('term', 'name academicYear');
 };
 
 export const findResultsBySubject = (subjectId, instituteId) =>
   Result.find({ subject: subjectId, institute: instituteId })
     .populate('student', 'fullName email')
-    .populate('subject', 'name totalMarks');
+    .populate('subject', 'name totalMarks caTotal examTotal');
 
 export const findResultsByStudentAndInstitute = (studentId, instituteId, termId) => {
   const filter = { student: studentId, institute: instituteId };
   if (termId) filter.term = termId;
   return Result.find(filter)
-    .populate('subject', 'name code totalMarks')
+    .populate('subject', 'name code totalMarks caTotal examTotal')
     .populate('term', 'name academicYear')
     .lean();
 };

@@ -8,7 +8,57 @@ import { notify, notifySuperAdmins } from '../utils/notify.js';
 import User from '../models/user.js';
 import FeePayment from '../models/FeePayment.js';
 import Result from '../models/Result.js';
+import ReportCardMeta from '../models/ReportCardMeta.js';
+import RatingTrait from '../models/RatingTrait.js';
+import { findDefaultByInstitute } from '../repositories/grading.repository.js';
+import { findDefaultByInstitute as findDefaultTemplate } from '../repositories/reportCardTemplate.repository.js';
+import { ensureDefaultGradingScale } from './grading.service.js';
+import { seedDefaultRatingTraits } from './ratingTrait.service.js';
 import { cacheGet, cacheSet, cacheDel, cacheDelPattern } from '../utils/cache.js';
+
+const PROMOTION_STATUSES = ['promoted', 'repeated', 'pending'];
+
+/**
+ * Load the institute's default grading scale, default report card template,
+ * and a student's report-card meta.
+ */
+const ageFromDob = (dob) => {
+  if (!dob) return null;
+  const diff = Date.now() - new Date(dob).getTime();
+  if (Number.isNaN(diff)) return null;
+  return Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+};
+
+const metaToObject = (metaDoc) =>
+  metaDoc
+    ? {
+        term: metaDoc.term ?? null,
+        classTeacherComment: metaDoc.classTeacherComment,
+        principalComment: metaDoc.principalComment,
+        promotionStatus: metaDoc.promotionStatus,
+        traitRatings: metaDoc.traitRatings ?? [],
+      }
+    : null;
+
+export const loadReportCardExtras = async (instituteId, studentId, termId) => {
+  const [scaleDoc, metaDoc, templateDoc, traitDocs, allMeta] = await Promise.all([
+    findDefaultByInstitute(instituteId),
+    ReportCardMeta.findOne({ institute: instituteId, student: studentId, term: termId ?? null }).lean(),
+    findDefaultTemplate(instituteId).lean(),
+    RatingTrait.find({ institute: instituteId }).sort({ domain: 1, order: 1, name: 1 }).lean(),
+    ReportCardMeta.find({ institute: instituteId, student: studentId }).lean(),
+  ]);
+  return {
+    gradingScale: scaleDoc ? { name: scaleDoc.name, grades: scaleDoc.grades } : null,
+    meta: metaToObject(metaDoc),
+    metaByTerm: allMeta.map(metaToObject),
+    template: templateDoc ?? null,
+    traits: {
+      affective: traitDocs.filter((t) => t.domain === 'affective'),
+      psychomotor: traitDocs.filter((t) => t.domain === 'psychomotor'),
+    },
+  };
+};
 
 // ─── Admin Signup ─────────────────────────────────────────────────────────────
 
@@ -368,6 +418,10 @@ export const createInstitute = async (body, req) => {
   const institute = await repo.createInstitute({ ...body, admin: req.user.id });
   await repo.updateUserById(req.user.id, { institute: institute._id });
 
+  // Seed the Sierra Leone standard grading scale + rating traits so the school starts standardised
+  await ensureDefaultGradingScale(institute._id, req.user.id);
+  await seedDefaultRatingTraits(institute._id, req.user.id);
+
   notifySuperAdmins({
     type: 'institute_created',
     title: 'New Institute Created',
@@ -457,9 +511,13 @@ export const getAllClasses = async (query, user) => {
   return result;
 };
 
-export const getStudentsByClass = (user) => {
+export const getStudentsByClass = (classId, user) => {
   const instituteId = user.institute?._id || user.institute;
-  return repo.findUsersPaginated({ role: 'student', institute: instituteId }, 0, 1000);
+  return repo.findUsersPaginated(
+    { role: 'student', institute: instituteId, class: classId },
+    0,
+    1000
+  );
 };
 
 export const getLecturerClasses = (lecturerId, user) => {
@@ -526,14 +584,28 @@ export const getReportCard = async (studentId, user, termId) => {
   ]);
 
   const totalClasses = attendanceRecords.length;
-  const presentCount = attendanceRecords.reduce((acc, record) => {
+  let presentCount = 0;
+  let absentCount = 0;
+  let lateCount = 0;
+  attendanceRecords.forEach((record) => {
     const entry = record.records?.find((r) => String(r.student) === String(studentId));
-    return acc + (entry?.status === 'present' ? 1 : 0);
-  }, 0);
-  const attendance = { present: presentCount, total: totalClasses, percentage: totalClasses > 0 ? Math.round((presentCount / totalClasses) * 100) : 0 };
+    if (!entry) return;
+    if (entry.status === 'present') presentCount += 1;
+    else if (entry.status === 'late') lateCount += 1;
+    else absentCount += 1;
+  });
+  const attendance = {
+    present: presentCount,
+    absent: absentCount,
+    late: lateCount,
+    total: totalClasses,
+    opened: totalClasses,
+    percentage: totalClasses > 0 ? Math.round((presentCount / totalClasses) * 100) : 0,
+  };
 
   // Position uses annual totals (all terms combined)
-  const classmates = await repo.findResultsForClassTotals(studentObj.class?._id ?? studentObj.class, user.institute);
+  const classId = studentObj.class?._id ?? studentObj.class;
+  const classmates = await repo.findResultsForClassTotals(classId, user.institute);
   const classTotals = {};
   classmates.forEach((r) => { const sid = String(r.student); classTotals[sid] = (classTotals[sid] ?? 0) + (r.marksObtained ?? 0); });
 
@@ -541,6 +613,23 @@ export const getReportCard = async (studentId, user, termId) => {
   const outOf = Object.keys(classTotals).length;
   const higherCount = Object.values(classTotals).filter((t) => t > myTotal).length;
   const position = { rank: outOf > 0 ? higherCount + 1 : null, outOf };
+
+  // Roll info — number on roll, the student's age, and the class average age
+  const classmateProfiles = classId
+    ? await User.find({ class: classId, role: 'student' }).select('studentProfile.dateOfBirth').lean()
+    : [];
+  const ages = classmateProfiles
+    .map((u) => ageFromDob(u.studentProfile?.dateOfBirth))
+    .filter((a) => a != null);
+  const roll = {
+    numberOnRoll: classmateProfiles.length,
+    age: ageFromDob(studentObj.studentProfile?.dateOfBirth),
+    averageAge: ages.length ? Math.round((ages.reduce((a, b) => a + b, 0) / ages.length) * 10) / 10 : null,
+    formTeacher: studentObj.class?.lecturer?.fullName ?? null,
+  };
+
+  const instituteId = user.institute?._id || user.institute;
+  const extras = await loadReportCardExtras(instituteId, studentId, termId);
 
   return {
     student: studentObj,
@@ -550,13 +639,66 @@ export const getReportCard = async (studentId, user, termId) => {
       _id: r._id,
       subject: r.subject,
       term: r.term ? { _id: r.term._id, name: r.term.name, academicYear: r.term.academicYear } : null,
+      caScore: r.caScore,
+      examScore: r.examScore,
       marksObtained: r.marksObtained,
       totalScore: r.totalScore ?? 100,
       grade: r.grade,
     })),
     attendance,
     position,
+    roll,
+    ...extras,
     generatedAt: new Date(),
+  };
+};
+
+export const saveReportCardMeta = async (studentId, body, req) => {
+  const { user } = req;
+  const instituteId = user.institute?._id || user.institute;
+  const termId = req.query.termId || null;
+
+  const student = await repo.findUserOne({ _id: studentId, institute: instituteId, role: 'student' });
+  if (!student) throw new AppError('Student not found', 404);
+
+  const { classTeacherComment, principalComment, promotionStatus, traitRatings } = body;
+  const update = {};
+  if (classTeacherComment !== undefined) update.classTeacherComment = classTeacherComment;
+  if (principalComment !== undefined) update.principalComment = principalComment;
+  if (promotionStatus !== undefined) {
+    if (!PROMOTION_STATUSES.includes(promotionStatus)) {
+      throw new AppError('Invalid promotion status', 400);
+    }
+    update.promotionStatus = promotionStatus;
+  }
+  if (Array.isArray(traitRatings)) {
+    update.traitRatings = traitRatings
+      .filter((r) => r && r.trait && r.rating != null)
+      .map((r) => ({ trait: r.trait, rating: Number(r.rating) }));
+  }
+
+  const meta = await ReportCardMeta.findOneAndUpdate(
+    { institute: instituteId, student: studentId, term: termId },
+    { $set: update, $setOnInsert: { createdBy: user._id } },
+    { upsert: true, new: true, runValidators: true }
+  );
+
+  await cacheDel(`reportcard:${studentId}`);
+
+  logAudit(req, {
+    action: 'UPDATE_REPORT_CARD_META',
+    entity: 'ReportCardMeta',
+    entityId: meta._id,
+    description: `Updated report-card remarks for student ${student.fullName}`,
+    after: update,
+    statusCode: 200,
+  });
+
+  return {
+    classTeacherComment: meta.classTeacherComment,
+    principalComment: meta.principalComment,
+    promotionStatus: meta.promotionStatus,
+    traitRatings: meta.traitRatings ?? [],
   };
 };
 
