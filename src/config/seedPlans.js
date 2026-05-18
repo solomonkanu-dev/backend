@@ -1,5 +1,9 @@
 import Plan from '../models/Plan.js';
 
+// Two plans: a Free tier and one paid 'standard' plan.
+// For 'standard', `price` is the per-student rate per term (NLe); the student
+// cap comes from what the institute paid for (Institute.subscription.studentsPaidFor),
+// so the `maxStudents` limit here is only a generous fallback.
 const plans = [
   {
     name: 'free',
@@ -8,16 +12,10 @@ const plans = [
     price: 0,
   },
   {
-    name: 'basic',
-    displayName: 'Basic',
-    limits: { maxStudents: 500, maxLecturers: 10, maxClasses: 10, maxStorageMB: 500 },
-    price: 1,
-  },
-  {
-    name: 'pro',
-    displayName: 'Pro',
-    limits: { maxStudents: 500, maxLecturers: 50, maxClasses: 20, maxStorageMB: 5000 },
-    price: 1,
+    name: 'standard',
+    displayName: 'Standard',
+    limits: { maxStudents: 100000, maxLecturers: 1000, maxClasses: 1000, maxStorageMB: 10000 },
+    price: 100,
   },
 ];
 

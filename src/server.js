@@ -10,7 +10,15 @@ import { startSnapshotCaptureJob } from './jobs/captureOnlineSnapshot.js';
 import { backfillQRTokens } from './services/qrAttendance.service.js';
 import { initSocket } from './socket.js';
 
-const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET'];
+const requiredEnvVars = [
+  'MONGO_URI',
+  'JWT_SECRET',
+  // Payment (Monime) — required so checkout and webhook signature verification work
+  'MONIME_API_KEY',
+  'MONIME_SPACE_ID',
+  'MONIME_WEBHOOK_SECRET',
+  'FRONTEND_URL',
+];
 for (const key of requiredEnvVars) {
   if (!process.env[key]) {
     console.error(`Missing required environment variable: ${key}`);

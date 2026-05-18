@@ -1,5 +1,6 @@
 import * as planService from '../services/plan.service.js';
 import * as monime from '../services/monime.service.js';
+import { AppError } from '../errors/AppError.js';
 
 export const getPlans = async (req, res, next) => {
   try {
@@ -46,10 +47,20 @@ export const getMyPlan = async (req, res, next) => {
   }
 };
 
+export const getBillingSummary = async (req, res, next) => {
+  try {
+    const data = await planService.getBillingSummary(req.user);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const createCheckout = async (req, res, next) => {
   try {
-    const frontendBaseUrl = process.env.FRONTEND_URL || 'https://studentmanagementfrontend.vercel.app';
-    const data = await planService.createCheckout(req.body.planId, req.user, frontendBaseUrl);
+    const frontendBaseUrl = process.env.FRONTEND_URL;
+    if (!frontendBaseUrl) throw new AppError('FRONTEND_URL is not configured', 500);
+    const data = await planService.createCheckout(req.body.studentCount, req.user, frontendBaseUrl);
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -61,6 +72,33 @@ export const verifyPayment = async (req, res, next) => {
     const { sessionId } = req.params;
     const data = await planService.verifyAndActivatePlan(sessionId, req.user);
     res.json({ success: true, message: 'Plan activated successfully', data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const recordManualPayment = async (req, res, next) => {
+  try {
+    const data = await planService.recordManualPayment(req.body, req);
+    res.json({ success: true, message: 'Payment recorded and plan activated', data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getPlanPayments = async (req, res, next) => {
+  try {
+    const data = await planService.getPlanPayments(req.user, req.query.instituteId);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getPlanPaymentReceipt = async (req, res, next) => {
+  try {
+    const data = await planService.getPlanPaymentReceipt(req.params.paymentId, req.user);
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
@@ -94,11 +132,12 @@ export const handleWebhook = async (req, res) => {
     if (!event || event.type !== 'checkout_session.completed') return;
 
     const metadata = event?.data?.metadata;
-    if (!metadata || typeof metadata.planId !== 'string' || typeof metadata.instituteId !== 'string') {
+    if (!metadata || typeof metadata.planPaymentId !== 'string') {
       console.warn('[webhook] Malformed metadata — rejecting');
       return;
     }
 
+    // Activation is idempotent — a duplicate webhook is a safe no-op.
     await planService.handleWebhookEvent(event);
   } catch (err) {
     console.error('[webhook] Error processing Monime event:', err);

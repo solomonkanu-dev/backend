@@ -65,6 +65,9 @@ const instituteSchema = new Schema(
     subscription: {
       assignedAt: { type: Date },
       assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+      // Per-student/term billing: capacity purchased and the term it covers.
+      studentsPaidFor: { type: Number, default: 0 },
+      term: { type: mongoose.Schema.Types.ObjectId, ref: 'AcademicTerm', default: null },
     },
 
     founded: {

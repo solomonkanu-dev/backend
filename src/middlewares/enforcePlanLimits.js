@@ -2,25 +2,29 @@ import User from '../models/user.js';
 import Institute from '../models/Institute.js';
 import Plan from '../models/Plan.js';
 import Class from '../models/Class.js';
-import { cacheGet, cacheSet } from '../utils/cache.js';
 
 const roleMap = { students: 'student', lecturers: 'lecturer' };
 const limitKeyMap = { students: 'maxStudents', lecturers: 'maxLecturers', classes: 'maxClasses' };
 
-const PLAN_TTL = 300; // 5 minutes — plan limits change rarely
-
-const getPlanLimits = async (instituteId) => {
-  const cacheKey = `institute:plan:${instituteId}`;
-  const cached = await cacheGet(cacheKey);
-  if (cached) return cached;
-
+// Effective limits for an institute. For the paid 'standard' plan the student
+// cap is what the institute paid for (Institute.subscription.studentsPaidFor),
+// and an expired subscription falls back to the free tier.
+const getEffectiveLimits = async (instituteId) => {
   const institute = await Institute.findById(instituteId).populate('plan');
-  let plan = institute?.plan;
-  if (!plan) plan = await Plan.findOne({ name: 'free' });
-  if (!plan) return null;
+  const freePlan = await Plan.findOne({ name: 'free' });
 
-  const limits = plan.limits;
-  await cacheSet(cacheKey, limits, PLAN_TTL);
+  const plan = institute?.plan;
+  const expired =
+    institute?.planExpiry && new Date(institute.planExpiry) < new Date();
+
+  if (!plan || expired) {
+    return freePlan?.limits || null;
+  }
+
+  const limits = { ...(plan.limits || {}) };
+  if (plan.name === 'standard' && institute.subscription?.studentsPaidFor > 0) {
+    limits.maxStudents = institute.subscription.studentsPaidFor;
+  }
   return limits;
 };
 
@@ -32,7 +36,7 @@ export const enforcePlanLimits = (resourceType) => async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Institute required' });
     }
 
-    const limits = await getPlanLimits(instituteId);
+    const limits = await getEffectiveLimits(instituteId);
 
     if (!limits) return next();
 
@@ -47,7 +51,7 @@ export const enforcePlanLimits = (resourceType) => async (req, res, next) => {
     const limitKey = limitKeyMap[resourceType];
     const limit = limits[limitKey];
 
-    if (count >= limit) {
+    if (limit !== undefined && count >= limit) {
       return res.status(403).json({
         success: false,
         message: `Plan limit reached. Contact service provider to Upgrade your plan to add more ${resourceType}.`,
