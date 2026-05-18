@@ -7,7 +7,12 @@ import Subject from '../models/Subject.js';
 import Assignment from '../models/Assignment.js';
 import Result from '../models/Result.js';
 import Attendance from '../models/Attendance.js';
+import Submission from '../models/Submission.js';
+import Plan from '../models/Plan.js'; // imported so .populate('plan') has a registered schema
 import mongoose from 'mongoose';
+
+// Touch Plan so linters/bundlers keep the import that registers the schema.
+void Plan;
 
 export const findUserById = (id) => User.findById(id);
 
@@ -218,3 +223,111 @@ export const findAdminOnboarding = (id) =>
     .select('-password')
     .populate('institute', 'name')
     .populate('onboarding.transitions.changedBy', 'fullName email role');
+
+// ─── Subscriptions ────────────────────────────────────────────────────────────
+
+// Every institute with its plan populated. The dataset is small (one row per
+// institute) so the subscription math is done in the service layer.
+export const findInstitutesWithPlan = () =>
+  Institute.find().populate('plan').lean();
+
+// ─── Academics ────────────────────────────────────────────────────────────────
+
+export const countClassesAll = () => Class.countDocuments({});
+
+export const countSubjectsAll = () => Subject.countDocuments({});
+
+export const countAssignmentsSince = (since) =>
+  Assignment.countDocuments({ createdAt: { $gte: since } });
+
+export const countResultsPublishedSince = (since) =>
+  Result.countDocuments({ isPublished: true, createdAt: { $gte: since } });
+
+export const aggregateSubmissionStats = (since) =>
+  Submission.aggregate([
+    { $match: { createdAt: { $gte: since } } },
+    { $group: { _id: '$status', count: { $sum: 1 } } },
+  ]);
+
+export const aggregateSubmissionsByInstitute = (since) =>
+  Submission.aggregate([
+    { $match: { createdAt: { $gte: since } } },
+    { $group: { _id: { institute: '$institute', status: '$status' }, count: { $sum: 1 } } },
+  ]);
+
+// Student attendance is stored as one doc per session with a `records` array,
+// so the rate is computed by unwinding the per-student records.
+export const aggregateAttendanceRate = (since) =>
+  Attendance.aggregate([
+    { $match: { type: 'student', date: { $gte: since } } },
+    { $unwind: '$records' },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+        present: { $sum: { $cond: [{ $eq: ['$records.status', 'present'] }, 1, 0] } },
+      },
+    },
+  ]);
+
+export const aggregateAttendanceTrend = (since) =>
+  Attendance.aggregate([
+    { $match: { type: 'student', date: { $gte: since } } },
+    { $unwind: '$records' },
+    {
+      $group: {
+        _id: { year: { $year: '$date' }, month: { $month: '$date' } },
+        total: { $sum: 1 },
+        present: { $sum: { $cond: [{ $eq: ['$records.status', 'present'] }, 1, 0] } },
+      },
+    },
+    { $sort: { '_id.year': 1, '_id.month': 1 } },
+  ]);
+
+export const aggregateAttendanceByInstitute = (since) =>
+  Attendance.aggregate([
+    { $match: { type: 'student', date: { $gte: since } } },
+    { $unwind: '$records' },
+    {
+      $group: {
+        _id: '$institute',
+        total: { $sum: 1 },
+        present: { $sum: { $cond: [{ $eq: ['$records.status', 'present'] }, 1, 0] } },
+      },
+    },
+  ]);
+
+export const aggregateGradeDistribution = (since) =>
+  Result.aggregate([
+    { $match: { isPublished: true, createdAt: { $gte: since }, grade: { $nin: [null, ''] } } },
+    { $group: { _id: '$grade', count: { $sum: 1 } } },
+    { $sort: { _id: 1 } },
+  ]);
+
+// `fails` uses a grade-letter heuristic: a result is a fail when its grade
+// starts with "F" (covers "F", "Fail", "F9"). The data model has no explicit
+// pass mark, so this is the platform-wide proxy.
+export const aggregateResultsByInstitute = (since) =>
+  Result.aggregate([
+    { $match: { isPublished: true, createdAt: { $gte: since }, grade: { $nin: [null, ''] } } },
+    {
+      $group: {
+        _id: '$institute',
+        total: { $sum: 1 },
+        fails: {
+          $sum: {
+            $cond: [{ $regexMatch: { input: '$grade', regex: '^f', options: 'i' } }, 1, 0],
+          },
+        },
+      },
+    },
+  ]);
+
+export const countStudentsByInstitute = () =>
+  User.aggregate([
+    { $match: { role: 'student' } },
+    { $group: { _id: '$institute', count: { $sum: 1 } } },
+  ]);
+
+export const countClassesByInstitute = () =>
+  Class.aggregate([{ $group: { _id: '$institute', count: { $sum: 1 } } }]);

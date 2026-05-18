@@ -227,3 +227,56 @@ export const getOnlineReport = async (req, res, next) => {
     next(err);
   }
 };
+
+export const getSubscriptionReport = async (req, res, next) => {
+  try {
+    const data = await superAdminService.getSubscriptionReport(req.query);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getAcademicReport = async (req, res, next) => {
+  try {
+    const data = await superAdminService.getAcademicReport(req.query.months);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const suspendInstitute = async (req, res, next) => {
+  try {
+    const data = await superAdminService.suspendInstitute(
+      req.params.instituteId,
+      req.body?.reason,
+      req
+    );
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const archiveInstitute = async (req, res, next) => {
+  try {
+    const data = await superAdminService.archiveInstitute(
+      req.params.instituteId,
+      req.body?.reason,
+      req
+    );
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const restoreInstitute = async (req, res, next) => {
+  try {
+    const data = await superAdminService.restoreInstitute(req.params.instituteId, req);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};

@@ -20,6 +20,15 @@ export const login = async (body, req) => {
   if (!user.approved) throw new AppError('Account pending approval', 403);
   if (!user.isActive) throw new AppError('Account has been suspended', 403);
 
+  if (
+    user.role !== 'super_admin' &&
+    user.institute &&
+    user.institute.status &&
+    user.institute.status !== 'active'
+  ) {
+    throw new AppError('Institute access has been disabled', 403);
+  }
+
   if (!user.password) throw new AppError('Invalid credentials', 401);
 
   const isMatch = await bcrypt.compare(password, user.password);

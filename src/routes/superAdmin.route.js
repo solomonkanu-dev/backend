@@ -26,6 +26,11 @@ import {
   getOnlineUsers,
   getOnlineReports,
   getOnlineReport,
+  getSubscriptionReport,
+  getAcademicReport,
+  suspendInstitute,
+  archiveInstitute,
+  restoreInstitute,
 } from '../controllers/superAdmin.controller.js';
 import auth from '../middlewares/auth.js';
 import superAdminOnly from '../middlewares/superAdmin.js';
@@ -101,6 +106,11 @@ router.get('/admins', auth, superAdminOnly, getAllAdmins);
 router.patch('/admins/:adminId/suspend', auth, superAdminOnly, suspendAdmin);
 router.patch('/admins/:adminId/unsuspend', auth, superAdminOnly, unsuspendAdmin);
 
+// Institute lifecycle
+router.patch('/institutes/:instituteId/suspend', auth, superAdminOnly, suspendInstitute);
+router.patch('/institutes/:instituteId/archive', auth, superAdminOnly, archiveInstitute);
+router.patch('/institutes/:instituteId/restore', auth, superAdminOnly, restoreInstitute);
+
 // Onboarding workflow
 router.get('/onboarding', auth, superAdminOnly, getAdminOnboardingList);
 router.get('/onboarding/:adminId', auth, superAdminOnly, getAdminOnboardingDetail);
@@ -129,5 +139,7 @@ router.get('/monitor/institutes/:instituteId', auth, superAdminOnly, getInstitut
 router.get('/monitor/growth', auth, superAdminOnly, getGrowthTrends);
 router.get('/monitor/fee-revenue', auth, superAdminOnly, getFeeRevenueReport);
 router.get('/monitor/salary-expenditure', auth, superAdminOnly, getSalaryExpenditureReport);
+router.get('/monitor/subscriptions', auth, superAdminOnly, getSubscriptionReport);
+router.get('/monitor/academics', auth, superAdminOnly, getAcademicReport);
 
 export default router;

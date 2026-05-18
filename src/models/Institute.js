@@ -87,6 +87,19 @@ const instituteSchema = new Schema(
       type: Boolean,
       default: false,
     },
+
+    // Lifecycle state, managed by super-admins.
+    // suspended/archived institutes have all their users blocked at login.
+    status: {
+      type: String,
+      enum: ['active', 'suspended', 'archived'],
+      default: 'active',
+    },
+
+    statusReason: {
+      type: String,
+      default: '',
+    },
   },
   { timestamps: true }
 );

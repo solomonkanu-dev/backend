@@ -160,7 +160,12 @@ export const getInstituteHealthReport = async () => {
         await repo.getInstituteReport(institute._id);
 
       return {
-        institute: { id: institute._id, name: institute.name, email: institute.email },
+        institute: {
+          id: institute._id,
+          name: institute.name,
+          email: institute.email,
+          status: institute.status || 'active',
+        },
         users: { students, lecturers, admins },
         academics: { classes, subjects },
         fees: feeStats[0] || { totalBilled: 0, totalCollected: 0, outstanding: 0, paidCount: 0, unpaidCount: 0 },
@@ -351,3 +356,288 @@ export const getOnlineReport = async (reportId) => {
   if (!report) throw new AppError('Report not found', 404);
   return report;
 };
+
+// ─── Subscription / revenue report ────────────────────────────────────────────
+// See docs/api-spec-super-admin-subscriptions.md in the frontend repo.
+// Plan.price is the ANNUAL price (NLe); MRR = price / 12. Only active,
+// non-expired subscriptions contribute to MRR/ARR.
+export const getSubscriptionReport = async ({ expiringDays } = {}) => {
+  const parsedDays = parseInt(expiringDays, 10);
+  const days = Math.max(0, Number.isNaN(parsedDays) ? 30 : parsedDays);
+  const institutes = await repo.findInstitutesWithPlan();
+
+  const now = Date.now();
+  const horizon = now + days * 86_400_000;
+  const round2 = (n) => Math.round(n * 100) / 100;
+
+  let mrr = 0;
+  let arr = 0;
+  let active = 0;
+  let paid = 0;
+  let free = 0;
+  let expiringSoon = 0;
+  let expiredCount = 0;
+  let unassigned = 0;
+
+  const planMap = new Map();
+  const expiring = [];
+  const expired = [];
+
+  for (const inst of institutes) {
+    const plan = inst.plan; // populated subdoc, or null
+    if (!plan) {
+      unassigned += 1;
+      continue;
+    }
+
+    const expiryTs = inst.planExpiry ? new Date(inst.planExpiry).getTime() : null;
+    const planName = plan.displayName || plan.name;
+
+    if (expiryTs !== null && expiryTs < now) {
+      expiredCount += 1;
+      expired.push({
+        instituteId: inst._id,
+        instituteName: inst.name,
+        planName,
+        planExpiry: new Date(expiryTs).toISOString(),
+        daysSinceExpiry: Math.floor((now - expiryTs) / 86_400_000),
+      });
+      continue;
+    }
+
+    // Active (non-expired) subscription
+    active += 1;
+    const price = plan.price || 0;
+    if (price > 0) paid += 1;
+    else free += 1;
+
+    const planMrr = price / 12;
+    mrr += planMrr;
+    arr += price;
+
+    const key = String(plan._id);
+    const entry =
+      planMap.get(key) ||
+      {
+        planId: key,
+        name: plan.name,
+        displayName: plan.displayName ?? null,
+        price,
+        instituteCount: 0,
+        mrr: 0,
+      };
+    entry.instituteCount += 1;
+    entry.mrr += planMrr;
+    planMap.set(key, entry);
+
+    if (expiryTs !== null && expiryTs <= horizon) {
+      expiringSoon += 1;
+      expiring.push({
+        instituteId: inst._id,
+        instituteName: inst.name,
+        planName,
+        planExpiry: new Date(expiryTs).toISOString(),
+        daysUntilExpiry: Math.floor((expiryTs - now) / 86_400_000),
+      });
+    }
+  }
+
+  expiring.sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry);
+  expired.sort((a, b) => a.daysSinceExpiry - b.daysSinceExpiry);
+
+  const byPlan = [...planMap.values()]
+    .map((p) => ({ ...p, mrr: round2(p.mrr) }))
+    .sort((a, b) => b.mrr - a.mrr);
+
+  return {
+    summary: {
+      mrr: round2(mrr),
+      arr: round2(arr),
+      activeSubscriptions: active,
+      paidSubscriptions: paid,
+      freeSubscriptions: free,
+      expiringSoon,
+      expired: expiredCount,
+      unassigned,
+    },
+    byPlan,
+    expiring,
+    expired,
+  };
+};
+
+// ─── Academic oversight report ────────────────────────────────────────────────
+// See docs/api-spec-super-admin-academics.md in the frontend repo.
+export const getAcademicReport = async (monthsParam) => {
+  const parsedMonths = parseInt(monthsParam, 10);
+  const months = Math.min(Math.max(Number.isNaN(parsedMonths) ? 6 : parsedMonths, 1), 24);
+  const since = new Date();
+  since.setMonth(since.getMonth() - (months - 1));
+  since.setDate(1);
+  since.setHours(0, 0, 0, 0);
+
+  const [
+    classes,
+    subjects,
+    assignments,
+    resultsPublished,
+    submissionStats,
+    attRate,
+    attTrend,
+    gradeDist,
+    attByInst,
+    resByInst,
+    subByInst,
+    studentsByInst,
+    classesByInst,
+    institutes,
+  ] = await Promise.all([
+    repo.countClassesAll(),
+    repo.countSubjectsAll(),
+    repo.countAssignmentsSince(since),
+    repo.countResultsPublishedSince(since),
+    repo.aggregateSubmissionStats(since),
+    repo.aggregateAttendanceRate(since),
+    repo.aggregateAttendanceTrend(since),
+    repo.aggregateGradeDistribution(since),
+    repo.aggregateAttendanceByInstitute(since),
+    repo.aggregateResultsByInstitute(since),
+    repo.aggregateSubmissionsByInstitute(since),
+    repo.countStudentsByInstitute(),
+    repo.countClassesByInstitute(),
+    repo.findAllInstitutesLean(),
+  ]);
+
+  // Integer percentage 0-100, or null when there is no underlying data.
+  const rate = (num, den) => (den > 0 ? Math.round((num / den) * 100) : null);
+
+  const graded = submissionStats.find((s) => s._id === 'graded')?.count ?? 0;
+  const pending = submissionStats.find((s) => s._id === 'pending')?.count ?? 0;
+  const totalSubmissions = graded + pending;
+
+  const att = attRate[0] || { total: 0, present: 0 };
+
+  const totalResults = resByInst.reduce((s, r) => s + r.total, 0);
+  const totalFails = resByInst.reduce((s, r) => s + r.fails, 0);
+
+  // Attendance trend — one entry per month in the window, nulls included.
+  const trendMap = new Map(attTrend.map((t) => [`${t._id.year}-${t._id.month}`, t]));
+  const attendanceTrend = [];
+  const cursor = new Date(since);
+  for (let i = 0; i < months; i += 1) {
+    const year = cursor.getFullYear();
+    const month = cursor.getMonth() + 1;
+    const t = trendMap.get(`${year}-${month}`);
+    attendanceTrend.push({ year, month, rate: t ? rate(t.present, t.total) : null });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  const gradeDistribution = gradeDist.map((g) => ({ grade: g._id, count: g.count }));
+
+  // Per-institute lookup maps
+  const attMap = new Map(attByInst.map((a) => [String(a._id), a]));
+  const resMap = new Map(resByInst.map((r) => [String(r._id), r]));
+  const studMap = new Map(studentsByInst.map((s) => [String(s._id), s.count]));
+  const classMap = new Map(classesByInst.map((c) => [String(c._id), c.count]));
+  const subMap = new Map();
+  for (const row of subByInst) {
+    const key = String(row._id.institute);
+    const e = subMap.get(key) || { graded: 0, pending: 0 };
+    e[row._id.status] = row.count;
+    subMap.set(key, e);
+  }
+
+  const byInstitute = institutes.map((inst) => {
+    const key = String(inst._id);
+    const a = attMap.get(key);
+    const r = resMap.get(key);
+    const sub = subMap.get(key) || { graded: 0, pending: 0 };
+    return {
+      instituteId: inst._id,
+      instituteName: inst.name,
+      students: studMap.get(key) ?? 0,
+      attendanceRate: a ? rate(a.present, a.total) : null,
+      passRate: r ? rate(r.total - r.fails, r.total) : null,
+      assignmentsGraded: sub.graded,
+      assignmentsPending: sub.pending,
+    };
+  });
+
+  const inactiveInstitutes = institutes
+    .filter((inst) => (classMap.get(String(inst._id)) ?? 0) === 0)
+    .map((inst) => ({
+      instituteId: inst._id,
+      instituteName: inst.name,
+      reason: 'No classes created',
+    }));
+
+  return {
+    summary: {
+      classes,
+      subjects,
+      assignments,
+      assignmentsGraded: graded,
+      assignmentsPending: pending,
+      submissionRate: rate(graded, totalSubmissions),
+      attendanceRate: rate(att.present, att.total),
+      resultsPublished,
+      examsPassRate: rate(totalResults - totalFails, totalResults),
+    },
+    attendanceTrend,
+    gradeDistribution,
+    byInstitute,
+    inactiveInstitutes,
+  };
+};
+
+// ─── Institute lifecycle ──────────────────────────────────────────────────────
+// Suspended/archived institutes have all their non-super-admin users blocked
+// at login and on every authenticated request (see middlewares/auth.js).
+
+const INSTITUTE_STATUS_META = {
+  suspended: { action: 'SUSPEND_INSTITUTE', verb: 'Suspended' },
+  archived: { action: 'ARCHIVE_INSTITUTE', verb: 'Archived' },
+  active: { action: 'RESTORE_INSTITUTE', verb: 'Restored' },
+};
+
+const setInstituteStatus = async (instituteId, status, reason, req) => {
+  if (!mongoose.Types.ObjectId.isValid(instituteId))
+    throw new AppError('Invalid institute ID', 400);
+
+  const institute = await repo.findInstituteById(instituteId);
+  if (!institute) throw new AppError('Institute not found', 404);
+
+  const current = institute.status || 'active';
+  if (current === status) throw new AppError(`Institute is already ${status}`, 400);
+
+  const meta = INSTITUTE_STATUS_META[status];
+  institute.status = status;
+  institute.statusReason = status === 'active' ? '' : reason || '';
+  await institute.save();
+
+  logAudit(req, {
+    action: meta.action,
+    entity: 'Institute',
+    entityId: institute._id,
+    description: `${meta.verb} institute ${institute.name}`,
+    before: { status: current },
+    after: { status },
+    statusCode: 200,
+  });
+
+  return {
+    id: institute._id,
+    name: institute.name,
+    status: institute.status,
+    statusReason: institute.statusReason,
+  };
+};
+
+export const suspendInstitute = (instituteId, reason, req) =>
+  setInstituteStatus(instituteId, 'suspended', reason, req);
+
+export const archiveInstitute = (instituteId, reason, req) =>
+  setInstituteStatus(instituteId, 'archived', reason, req);
+
+export const restoreInstitute = (instituteId, req) =>
+  setInstituteStatus(instituteId, 'active', '', req);

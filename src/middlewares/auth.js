@@ -28,7 +28,7 @@ const auth = async (req, res, next) => {
     // 4️⃣ Fetch user
     const user = await User.findById(payload.id)
       .select("-password")
-      .populate("institute", "name logo schoolType onboardingCompleted");
+      .populate("institute", "name logo schoolType onboardingCompleted status");
 
     if (!user) {
       return res.status(401).json({ message: "User not found" });
@@ -37,6 +37,18 @@ const auth = async (req, res, next) => {
     // 5️⃣ Check if account is suspended
     if (!user.isActive) {
       return res.status(403).json({ message: "Account has been suspended" });
+    }
+
+    // 5b. Block users whose institute has been suspended or archived
+    if (
+      user.role !== "super_admin" &&
+      user.institute &&
+      user.institute.status &&
+      user.institute.status !== "active"
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Institute access has been disabled" });
     }
 
     // 6️⃣ Attach user
