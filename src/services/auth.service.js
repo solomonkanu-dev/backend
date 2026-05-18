@@ -29,10 +29,30 @@ export const login = async (body, req) => {
     throw new AppError('Institute access has been disabled', 403);
   }
 
-  if (!user.password) throw new AppError('Invalid credentials', 401);
+  if (!user.password) {
+    logAudit(req, {
+      action: 'LOGIN_FAILED',
+      entity: 'User',
+      entityId: user._id,
+      description: `Failed login — no password set for ${user.email}`,
+      statusCode: 401,
+      userOverride: user,
+    });
+    throw new AppError('Invalid credentials', 401);
+  }
 
   const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) throw new AppError('Invalid credentials', 401);
+  if (!isMatch) {
+    logAudit(req, {
+      action: 'LOGIN_FAILED',
+      entity: 'User',
+      entityId: user._id,
+      description: `Failed login — incorrect password for ${user.email}`,
+      statusCode: 401,
+      userOverride: user,
+    });
+    throw new AppError('Invalid credentials', 401);
+  }
 
   const token = signToken(user);
 
