@@ -129,14 +129,20 @@ export const createStudent = async ({ fullName, email, classId, studentProfile }
 export const getAllStudents = async (query, user) => {
   const page = parseInt(query.page) || 1;
   const limit = Math.min(parseInt(query.limit) || 20, 100);
+  const search = (query.search ?? '').toString().trim();
   const instituteId = user.institute?._id ?? user.institute;
-  const cacheKey = `admin:students:${instituteId}:p${page}:l${limit}`;
+  const cacheKey = `admin:students:${instituteId}:p${page}:l${limit}:s${search}`;
 
   const cached = await cacheGet(cacheKey);
   if (cached) return cached;
 
   const skip = (page - 1) * limit;
   const filter = { role: 'student', institute: user.institute, archivedAt: null };
+  if (search) {
+    // Escape regex metacharacters so the search term is matched literally.
+    const safe = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.fullName = { $regex: safe, $options: 'i' };
+  }
   const [data, total] = await Promise.all([
     repo.findStudentsPaginated(filter, skip, limit),
     repo.countUsers(filter),
