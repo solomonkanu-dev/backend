@@ -982,7 +982,7 @@ export const restoreParentAccess = async (parentId, user) => {
   await parent.save();
 };
 
-export const updateMyProfile = async (userId, { fullName, email }) => {
+export const updateMyProfile = async (userId, { fullName, email, phoneNumber }) => {
   const user = await repo.findUserOne({ _id: userId });
   if (!user) throw new AppError('User not found', 404);
   if (email && email !== user.email) {
@@ -991,6 +991,7 @@ export const updateMyProfile = async (userId, { fullName, email }) => {
     user.email = email;
   }
   if (fullName) user.fullName = fullName;
+  if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
   await user.save();
   return user;
 };
