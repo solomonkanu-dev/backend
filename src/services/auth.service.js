@@ -73,6 +73,42 @@ export const login = async (body, req) => {
 
 export const getMe = async (userId) => authRepo.findByIdWithInstitute(userId);
 
+export const changePassword = async (userId, { currentPassword, newPassword }, req) => {
+  if (!currentPassword || !newPassword) {
+    throw new AppError('Current and new password are required', 400);
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < 8) {
+    throw new AppError('New password must be at least 8 characters', 400);
+  }
+
+  const user = await authRepo.findByIdForPasswordChange(userId);
+  if (!user) throw new AppError('User not found', 404);
+  if (!user.password) throw new AppError('Password reset is not available for this account', 400);
+
+  const isMatch = await bcrypt.compare(currentPassword, user.password);
+  if (!isMatch) {
+    logAudit(req, {
+      action: 'CHANGE_PASSWORD_FAILED',
+      entity: 'User',
+      entityId: user._id,
+      description: 'Failed password change — incorrect current password',
+      statusCode: 401,
+    });
+    throw new AppError('Current password is incorrect', 401);
+  }
+
+  user.password = await bcrypt.hash(newPassword, 12);
+  await user.save();
+
+  logAudit(req, {
+    action: 'CHANGE_PASSWORD',
+    entity: 'User',
+    entityId: user._id,
+    description: `${user.role} changed their password`,
+    statusCode: 200,
+  });
+};
+
 export const logout = (req) => {
   logAudit(req, {
     action: 'LOGOUT',

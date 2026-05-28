@@ -5,6 +5,7 @@ import {
   createCheckout, verifyPayment, handleWebhook,
   getBillingSummary, recordManualPayment,
   getPlanPayments, getPlanPaymentReceipt,
+  createPlan, deletePlan,
 } from '../controllers/plan.controller.js';
 import auth from '../middlewares/auth.js';
 import superAdminOnly from '../middlewares/superAdmin.js';
@@ -34,6 +35,8 @@ router.get('/available', auth, getAvailablePlans);
 router.get('/my-plan', auth, getMyPlan);
 router.patch('/assign', auth, superAdminOnly, assignPlanToInstitute);
 router.get('/', auth, superAdminOnly, getPlans);
+router.post('/', auth, superAdminOnly, createPlan);
 router.patch('/:planId', auth, superAdminOnly, updatePlanLimits);
+router.delete('/:planId', auth, superAdminOnly, deletePlan);
 
 export default router;

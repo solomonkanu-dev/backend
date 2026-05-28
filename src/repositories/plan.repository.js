@@ -15,6 +15,12 @@ export const findByIdAndUpdate = (id, update) =>
 
 export const findByName = (name) => Plan.findOne({ name });
 
+export const createPlan = (data) => Plan.create(data);
+
+export const deleteById = (id) => Plan.findByIdAndDelete(id);
+
+export const countInstitutesOnPlan = (planId) => Institute.countDocuments({ plan: planId });
+
 export const updateInstituteWithPlan = (instituteId, update) =>
   Institute.findByIdAndUpdate(instituteId, update, { new: true }).populate('plan');
 

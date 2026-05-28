@@ -28,6 +28,15 @@ export const getMe = async (req, res, next) => {
   }
 };
 
+export const changePassword = async (req, res, next) => {
+  try {
+    await authService.changePassword(req.user.id, req.body, req);
+    res.json({ message: 'Password updated successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const logout = (req, res) => {
   authService.logout(req);
 

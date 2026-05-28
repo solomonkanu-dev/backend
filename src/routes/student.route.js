@@ -25,7 +25,14 @@ router.patch('/email-preferences', auth, async (req, res) => {
       return res.status(400).json({ message: 'optOut must be an array of notification type strings' });
     }
 
-    const allowed = ['announcement', 'assignmentPosted'];
+    const allowed = [
+      'announcement',
+      'assignmentPosted',
+      'feePayment',
+      'resultsPublished',
+      'attendance',
+      'attendanceAlert',
+    ];
     const sanitized = optOut.filter((t) => allowed.includes(t));
 
     await User.findByIdAndUpdate(req.user._id, { emailOptOut: sanitized });

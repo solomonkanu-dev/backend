@@ -10,3 +10,6 @@ export const findByEmailWithInstitute = (email) =>
 
 export const findByIdWithInstitute = (id) =>
   User.findById(id).select('-password').populate('institute', 'name logo schoolType onboardingCompleted status');
+
+// Includes password — only use for verify-then-set password change flows
+export const findByIdForPasswordChange = (id) => User.findById(id);

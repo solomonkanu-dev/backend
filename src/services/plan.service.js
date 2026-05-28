@@ -11,6 +11,63 @@ const PAID_PLAN_NAME = 'standard';
 
 export const getPlans = () => repo.findAll();
 
+export const createPlan = async (body, req) => {
+  const { name, displayName, description, price, limits } = body ?? {};
+  if (!name || typeof name !== 'string') throw new AppError('Plan name is required', 400);
+  if (!limits || typeof limits !== 'object') throw new AppError('Plan limits are required', 400);
+
+  const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  if (!slug) throw new AppError('Plan name is invalid', 400);
+
+  const existing = await repo.findByName(slug);
+  if (existing) throw new AppError(`Plan "${slug}" already exists`, 409);
+
+  const plan = await repo.createPlan({
+    name: slug,
+    displayName: displayName?.trim() || slug,
+    description: description?.trim() || undefined,
+    price: Number(price) || 0,
+    limits: {
+      maxStudents: Number(limits.maxStudents) || 0,
+      maxLecturers: Number(limits.maxLecturers) || 0,
+      maxClasses: Number(limits.maxClasses) || 0,
+    },
+  });
+
+  logAudit(req, {
+    action: 'CREATE_PLAN',
+    entity: 'Plan',
+    entityId: plan._id,
+    description: `Created plan "${plan.name}"`,
+    statusCode: 201,
+  });
+
+  return plan;
+};
+
+export const deletePlan = async (planId, req) => {
+  const plan = await repo.findById(planId);
+  if (!plan) throw new AppError('Plan not found', 404);
+  if (plan.name === 'free' || plan.name === 'standard') {
+    throw new AppError('The built-in free and standard plans cannot be deleted', 400);
+  }
+
+  const inUse = await repo.countInstitutesOnPlan(planId);
+  if (inUse > 0) {
+    throw new AppError(`Cannot delete: ${inUse} institute(s) are on this plan`, 409);
+  }
+
+  await repo.deleteById(planId);
+
+  logAudit(req, {
+    action: 'DELETE_PLAN',
+    entity: 'Plan',
+    entityId: planId,
+    description: `Deleted plan "${plan.name}"`,
+    statusCode: 200,
+  });
+};
+
 export const updatePlanLimits = async (planId, body) => {
   const plan = await repo.findByIdAndUpdate(planId, {
     limits: body.limits,

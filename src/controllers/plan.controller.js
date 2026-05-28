@@ -29,6 +29,24 @@ export const updatePlanLimits = async (req, res, next) => {
   }
 };
 
+export const createPlan = async (req, res, next) => {
+  try {
+    const data = await planService.createPlan(req.body, req);
+    res.status(201).json({ success: true, message: 'Plan created', data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deletePlan = async (req, res, next) => {
+  try {
+    await planService.deletePlan(req.params.planId, req);
+    res.json({ success: true, message: 'Plan deleted' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const assignPlanToInstitute = async (req, res, next) => {
   try {
     const data = await planService.assignPlanToInstitute(req.body, req);
