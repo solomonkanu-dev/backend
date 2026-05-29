@@ -5,7 +5,15 @@ import { getIO } from "../socket.js";
 // Emit a message event to all participants of a conversation
 function emitToParticipants(conv, event, payload) {
   const io = getIO();
-  if (!io) return;
+  if (!io) {
+    console.warn(`[chat] emit ${event} skipped — io not initialised`);
+    return;
+  }
+  const rooms = conv.participants.map((p) => `user:${p._id ?? p}`);
+  const sizes = rooms.map((r) => io.sockets.adapter.rooms.get(r)?.size ?? 0);
+  console.log(
+    `[chat] emit ${event} conv=${conv._id} rooms=[${rooms.join(",")}] sockets=[${sizes.join(",")}]`
+  );
   conv.participants.forEach((p) => {
     io.to(`user:${p._id ?? p}`).emit(event, payload);
   });

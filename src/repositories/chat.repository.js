@@ -25,11 +25,32 @@ export const findConversationById = (id, userId) =>
     .populate("participants", "fullName role profilePhoto")
     .populate({ path: "lastMessage", select: "content sender createdAt" });
 
-export const findConversationsByUser = (userId) =>
-  Conversation.find({ participants: userId })
+export const findConversationsByUser = async (userId) => {
+  const conversations = await Conversation.find({ participants: userId })
     .populate("participants", "fullName role profilePhoto")
     .populate({ path: "lastMessage", populate: { path: "sender", select: "fullName" } })
-    .sort({ lastMessageAt: -1 });
+    .sort({ lastMessageAt: -1 })
+    .lean();
+
+  if (conversations.length === 0) return [];
+
+  const unread = await Message.aggregate([
+    {
+      $match: {
+        conversation: { $in: conversations.map((c) => c._id) },
+        readBy: { $ne: userId },
+        sender: { $ne: userId },
+      },
+    },
+    { $group: { _id: "$conversation", count: { $sum: 1 } } },
+  ]);
+
+  const unreadByConv = new Map(unread.map((u) => [String(u._id), u.count]));
+  return conversations.map((c) => ({
+    ...c,
+    unread: unreadByConv.get(String(c._id)) ?? 0,
+  }));
+};
 
 export const findMessages = (conversationId, limit = 50, before = null) => {
   const query = { conversation: conversationId };
