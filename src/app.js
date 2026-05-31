@@ -46,6 +46,7 @@ import chatRoutes from "./routes/chat.route.js";
 import examRoutes from "./routes/exam.route.js";
 import galleryRoutes from "./routes/gallery.route.js";
 import financialRoutes from "./routes/financial.route.js";
+import ruleBookRoutes from "./routes/ruleBook.route.js";
 import { maintenanceCheck } from "./middlewares/maintenanceCheck.js";
 import { csrfProtection } from "./middlewares/csrfProtection.js";
 
@@ -173,6 +174,7 @@ app.use("/api/v1/chat", chatRoutes);
 app.use("/api/v1/exam", examRoutes);
 app.use("/api/v1/gallery", galleryRoutes);
 app.use("/api/v1/financial", financialRoutes);
+app.use("/api/v1/rules", ruleBookRoutes);
 
 // Error handler (last)
 app.use(errorHandler);
