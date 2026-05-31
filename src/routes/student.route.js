@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getStudents, getStudentById, getMyFees, getMyResults, getMyReportCard, getMyPayments, getMyPaymentReceipt, getMyFullReceipt, getMyRanking, getMyPromotionHistory } from '../controllers/student.controller.js';
+import { getMyQR } from '../controllers/qr.attendance.controller.js';
 import auth from '../middlewares/auth.js';
 import { adminOnly } from '../middlewares/adminOnly.js';
 import User from '../models/user.js';
@@ -15,6 +16,7 @@ router.get('/my-ranking', auth, getMyRanking);
 router.get('/my-payments', auth, getMyPayments);
 router.get('/my-payments/full-receipt', auth, getMyFullReceipt);
 router.get('/my-payments/:paymentId/receipt', auth, getMyPaymentReceipt);
+router.get('/my-qr', auth, getMyQR);
 
 // Email notification preferences
 router.patch('/email-preferences', auth, async (req, res) => {

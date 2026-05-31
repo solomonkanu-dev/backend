@@ -38,6 +38,15 @@ export const getStudentQR = async (req, res, next) => {
   }
 };
 
+export const getMyQR = async (req, res, next) => {
+  try {
+    const data = await qrAttendanceService.getStudentQR(req.user._id, req.user);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const toggleStudentQR = async (req, res, next) => {
   try {
     const student = await qrAttendanceService.toggleStudentQR(
