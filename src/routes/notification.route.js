@@ -7,14 +7,18 @@ import {
   deleteNotification,
   registerPushToken,
   unregisterPushToken,
+  getPushDiagnostic,
+  sendTestPush,
 } from '../controllers/notification.controller.js';
 import auth from '../middlewares/auth.js';
 
 const router = Router();
 
-// Note: /unread-count, /read-all, /push-token defined before /:id to avoid conflicts
+// Note: literal paths defined before /:id to avoid conflicts
 router.get('/', auth, getMyNotifications);
 router.get('/unread-count', auth, getUnreadCount);
+router.get('/diagnostic', auth, getPushDiagnostic);
+router.post('/test-push', auth, sendTestPush);
 router.patch('/read-all', auth, markAllRead);
 router.post('/push-token', auth, registerPushToken);
 router.delete('/push-token', auth, unregisterPushToken);

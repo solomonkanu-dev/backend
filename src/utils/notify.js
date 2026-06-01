@@ -104,9 +104,26 @@ export const notifyMany = async ({
 
     const users = await User.find(
       { _id: { $in: uniqueIds } },
-      'expoPushTokens'
+      'expoPushTokens role'
     ).lean();
     const tokens = users.flatMap((u) => u.expoPushTokens || []);
+    const usersByRoleWithTokens = users.reduce((acc, u) => {
+      const has = (u.expoPushTokens || []).length;
+      if (!has) return acc;
+      acc[u.role] = (acc[u.role] || 0) + 1;
+      return acc;
+    }, {});
+    const usersByRoleWithoutTokens = users.reduce((acc, u) => {
+      const has = (u.expoPushTokens || []).length;
+      if (has) return acc;
+      acc[u.role] = (acc[u.role] || 0) + 1;
+      return acc;
+    }, {});
+    console.log(
+      `[notifyMany] type=${type} recipients=${uniqueIds.length} ` +
+        `withTokens=${JSON.stringify(usersByRoleWithTokens)} ` +
+        `withoutTokens=${JSON.stringify(usersByRoleWithoutTokens)}`
+    );
     if (tokens.length === 0) return;
 
     sendExpoPushes(tokens, {

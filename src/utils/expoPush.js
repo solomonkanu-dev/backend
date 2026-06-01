@@ -66,6 +66,9 @@ export const sendExpoPushes = async (tokens, payload) => {
   }));
 
   const tickets = [];
+  let okCount = 0;
+  let errCount = 0;
+  const errorsByCode = {};
 
   for (const batch of chunk(messages, 100)) {
     try {
@@ -84,11 +87,13 @@ export const sendExpoPushes = async (tokens, payload) => {
       const stale = [];
       data.forEach((ticket, i) => {
         tickets.push(ticket);
-        if (
-          ticket?.status === 'error' &&
-          ticket?.details?.error === 'DeviceNotRegistered'
-        ) {
-          stale.push(batch[i].to);
+        if (ticket?.status === 'ok') {
+          okCount += 1;
+        } else if (ticket?.status === 'error') {
+          errCount += 1;
+          const code = ticket?.details?.error || 'Unknown';
+          errorsByCode[code] = (errorsByCode[code] || 0) + 1;
+          if (code === 'DeviceNotRegistered') stale.push(batch[i].to);
         }
       });
 
@@ -98,15 +103,20 @@ export const sendExpoPushes = async (tokens, payload) => {
             { expoPushTokens: { $in: stale } },
             { $pull: { expoPushTokens: { $in: stale } } }
           );
+          console.log(`[expoPush] pruned ${stale.length} DeviceNotRegistered tokens`);
         } catch {
           /* ignore cleanup failure */
         }
       }
     } catch (err) {
-      // Network or Expo outage. Log and move on.
       console.warn('[expoPush] batch send failed:', err?.message ?? err);
     }
   }
+
+  console.log(
+    `[expoPush] type=${type ?? 'unknown'} tokens=${valid.length} ok=${okCount} err=${errCount}` +
+      (errCount > 0 ? ` errors=${JSON.stringify(errorsByCode)}` : '')
+  );
 
   return tickets;
 };

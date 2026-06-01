@@ -93,3 +93,70 @@ export const unregisterPushToken = async (userId, token) => {
   );
   return { token };
 };
+
+const maskToken = (t) => {
+  if (typeof t !== 'string' || t.length < 12) return t;
+  const head = t.slice(0, 18);
+  const tail = t.slice(-6);
+  return `${head}…${tail}`;
+};
+
+/**
+ * Returns push-delivery diagnostic info for the calling user. Lets the mobile
+ * app (or curl) confirm whether their device's token actually reached the
+ * server before reporting that a notification "didn't arrive".
+ */
+export const getPushDiagnostic = async (user) => {
+  const fresh = await User.findById(user._id).select('expoPushTokens role fullName email').lean();
+  const tokens = fresh?.expoPushTokens ?? [];
+
+  // Look up other users that share any of our tokens (should always be empty
+  // after the dedupe fix; surfacing this helps spot stale duplicates).
+  const collidingUsers = tokens.length > 0
+    ? await User.find(
+        { _id: { $ne: user._id }, expoPushTokens: { $in: tokens } },
+        '_id fullName role'
+      ).lean()
+    : [];
+
+  return {
+    userId: String(user._id),
+    role: fresh?.role,
+    fullName: fresh?.fullName,
+    email: fresh?.email,
+    tokenCount: tokens.length,
+    tokens: tokens.map(maskToken),
+    collidingUsers: collidingUsers.map((u) => ({
+      id: String(u._id),
+      fullName: u.fullName,
+      role: u.role,
+    })),
+  };
+};
+
+/**
+ * Sends a test Expo push to the calling user's own tokens. Useful to verify
+ * end-to-end delivery without triggering a real workflow event.
+ */
+export const sendTestPush = async (user) => {
+  const fresh = await User.findById(user._id).select('expoPushTokens').lean();
+  const tokens = fresh?.expoPushTokens ?? [];
+  if (tokens.length === 0) {
+    return { sent: 0, message: 'No push tokens registered for this account.' };
+  }
+
+  const { sendExpoPushes } = await import('../utils/expoPush.js');
+  const tickets = await sendExpoPushes(tokens, {
+    title: 'EduSalone test push',
+    body: 'If you can read this, your device is receiving notifications correctly.',
+    data: { type: 'test_push' },
+  });
+
+  const ok = tickets.filter((t) => t?.status === 'ok').length;
+  const errors = tickets.filter((t) => t?.status === 'error');
+  return {
+    sent: tickets.length,
+    ok,
+    errors: errors.map((t) => t?.details?.error || t?.message || 'Unknown'),
+  };
+};

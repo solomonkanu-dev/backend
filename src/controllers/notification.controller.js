@@ -62,3 +62,21 @@ export const unregisterPushToken = async (req, res, next) => {
     next(err);
   }
 };
+
+export const getPushDiagnostic = async (req, res, next) => {
+  try {
+    const data = await notificationService.getPushDiagnostic(req.user);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const sendTestPush = async (req, res, next) => {
+  try {
+    const data = await notificationService.sendTestPush(req.user);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
