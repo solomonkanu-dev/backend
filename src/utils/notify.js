@@ -1,6 +1,7 @@
 import Notification from '../models/Notification.js';
 import { getIO } from '../socket.js';
 import { sendExpoPushToUser, sendExpoPushes } from './expoPush.js';
+import User from '../models/user.js';
 
 const push = (recipientId, notification) => {
   const io = getIO();
@@ -63,4 +64,58 @@ export const notifySuperAdmins = async ({ type, title, message, relatedEntity })
       }).catch(() => {});
     }
   } catch (_) {}
+};
+
+/**
+ * Fanout helper: create one Notification per recipient, emit `new_notification`
+ * per user room, and send a single batched Expo push to all collected tokens.
+ * Best-effort; never throws.
+ */
+export const notifyMany = async ({
+  recipientIds,
+  instituteId,
+  type,
+  title,
+  message,
+  relatedEntity,
+  pushChannelId,
+}) => {
+  try {
+    const uniqueIds = [...new Set((recipientIds || []).map(String))].filter(Boolean);
+    if (uniqueIds.length === 0) return;
+
+    const docs = uniqueIds.map((rid) => ({
+      recipient: rid,
+      institute: instituteId || null,
+      type,
+      title,
+      message,
+      relatedEntity: relatedEntity || {},
+    }));
+
+    const notifications = await Notification.insertMany(docs, { ordered: false });
+
+    const io = getIO();
+    if (io) {
+      notifications.forEach((n) => {
+        io.to(`user:${n.recipient}`).emit('new_notification', n);
+      });
+    }
+
+    const users = await User.find(
+      { _id: { $in: uniqueIds } },
+      'expoPushTokens'
+    ).lean();
+    const tokens = users.flatMap((u) => u.expoPushTokens || []);
+    if (tokens.length === 0) return;
+
+    sendExpoPushes(tokens, {
+      title: title || 'EduSalone',
+      body: message || '',
+      channelId: pushChannelId,
+      data: { type, ...(relatedEntity || {}) },
+    }).catch(() => {});
+  } catch (_) {
+    // fire-and-forget
+  }
 };

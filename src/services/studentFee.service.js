@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import * as repo from '../repositories/studentFee.repository.js';
 import User from '../models/user.js';
 import { AppError } from '../errors/AppError.js';
+import { notify, notifyMany } from '../utils/notify.js';
 
 export const getStructuresForStudent = async (studentId) => {
   if (!mongoose.Types.ObjectId.isValid(studentId)) throw new AppError('Invalid student ID', 400);
@@ -11,6 +12,33 @@ export const getStructuresForStudent = async (studentId) => {
 
   const instituteId = student.institute?._id || student.institute;
   return repo.findStructuresForStudent(instituteId, student.class, studentId);
+};
+
+const fanoutFeeAssignedNotification = async ({ studentId, student, instituteId, amount }) => {
+  if (!amount || amount <= 0) return;
+  try {
+    notify({
+      recipientId: studentId,
+      instituteId,
+      type: 'fee_assigned',
+      title: 'New fee assigned',
+      message: `${amount.toLocaleString()} has been added to your fees.`,
+      relatedEntity: { entityType: 'StudentFee', studentId },
+    });
+    const parents = await User.find({ role: 'parent', linkedStudents: studentId }, '_id').lean();
+    if (parents.length > 0) {
+      notifyMany({
+        recipientIds: parents.map((p) => p._id),
+        instituteId,
+        type: 'fee_assigned',
+        title: `New fee for ${student.fullName}`,
+        message: `${amount.toLocaleString()} has been added to your child's fees.`,
+        relatedEntity: { entityType: 'StudentFee', studentId },
+      });
+    }
+  } catch {
+    /* ignore */
+  }
 };
 
 export const assignFeeToStudent = async ({ studentId, selectedParticulars }) => {
@@ -47,17 +75,21 @@ export const assignFeeToStudent = async ({ studentId, selectedParticulars }) => 
 
     const addedAmount = validatedFees.reduce((sum, f) => sum + f.amount, 0);
 
+    let updated;
     if (existing) {
-      return repo.updateStudentFeeById(existing._id, {
+      updated = await repo.updateStudentFeeById(existing._id, {
         $push: { fees: { $each: validatedFees } },
         $inc: { totalAmount: addedAmount, balance: addedAmount },
       });
+    } else {
+      updated = await repo.createStudentFee({
+        student: studentId, class: classId, institute: instituteId,
+        fees: validatedFees, feeStructures: [], totalAmount: addedAmount, balance: addedAmount,
+      });
     }
 
-    return repo.createStudentFee({
-      student: studentId, class: classId, institute: instituteId,
-      fees: validatedFees, feeStructures: [], totalAmount: addedAmount, balance: addedAmount,
-    });
+    fanoutFeeAssignedNotification({ studentId, student, instituteId, amount: addedAmount });
+    return updated;
   }
 
   // Auto-detect from applicable structures
@@ -76,19 +108,23 @@ export const assignFeeToStudent = async ({ studentId, selectedParticulars }) => 
   const addedAmount = newFees.reduce((sum, f) => sum + f.amount, 0);
   const newStructureIds = newStructures.map((s) => s._id);
 
+  let updated;
   if (existing) {
-    return repo.updateStudentFeeById(existing._id, {
+    updated = await repo.updateStudentFeeById(existing._id, {
       // $push: { fees: { $each: newFees }, feeStructures: { $each: newStructureIds } },
       $push: { fees: { $each: newFees } },
       $addToSet: { feeStructures: { $each: newStructureIds } },
       $inc: { totalAmount: addedAmount, balance: addedAmount },
     });
+  } else {
+    updated = await repo.createStudentFee({
+      student: studentId, class: classId, institute: instituteId,
+      fees: newFees, feeStructures: newStructureIds, totalAmount: addedAmount, balance: addedAmount,
+    });
   }
 
-  return repo.createStudentFee({
-    student: studentId, class: classId, institute: instituteId,
-    fees: newFees, feeStructures: newStructureIds, totalAmount: addedAmount, balance: addedAmount,
-  });
+  fanoutFeeAssignedNotification({ studentId, student, instituteId, amount: addedAmount });
+  return updated;
 };
 
 export const getStudentsWithFees = (instituteId) => repo.findStudentsWithFees(instituteId);

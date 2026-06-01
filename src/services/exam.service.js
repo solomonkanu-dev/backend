@@ -2,8 +2,10 @@ import * as repo from '../repositories/exam.repository.js';
 import Subject from '../models/Subject.js';
 import Class from '../models/Class.js';
 import AcademicTerm from '../models/AcademicTerm.js';
+import User from '../models/user.js';
 import { AppError } from '../errors/AppError.js';
 import { logAudit } from '../utils/audit.js';
+import { notifyMany } from '../utils/notify.js';
 
 const getInstituteId = (user) => user.institute?._id || user.institute;
 
@@ -45,6 +47,50 @@ export const createExam = async (body, req) => {
     description: `Created exam "${title}"`,
     statusCode: 201,
   });
+
+  // Fanout to students in the class and their linked parents
+  (async () => {
+    try {
+      const students = await User.find(
+        { role: 'student', institute: instituteId, class: classId, isActive: true },
+        '_id'
+      ).lean();
+      const studentIds = students.map((s) => s._id);
+
+      const examDate = new Date(date).toLocaleDateString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric',
+      });
+      const time = startTime ? ` at ${startTime}` : '';
+
+      if (studentIds.length > 0) {
+        await notifyMany({
+          recipientIds: studentIds,
+          instituteId,
+          type: 'exam_scheduled',
+          title: `Exam scheduled: ${title}`,
+          message: `${subject.name} on ${examDate}${time}.`,
+          relatedEntity: { entityType: 'Exam', entityId: exam._id },
+        });
+
+        const parents = await User.find(
+          { role: 'parent', linkedStudents: { $in: studentIds } },
+          '_id'
+        ).lean();
+        if (parents.length > 0) {
+          await notifyMany({
+            recipientIds: parents.map((p) => p._id),
+            instituteId,
+            type: 'exam_scheduled',
+            title: `Exam scheduled: ${title}`,
+            message: `${subject.name} for ${cls.name} on ${examDate}${time}.`,
+            relatedEntity: { entityType: 'Exam', entityId: exam._id },
+          });
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  })();
 
   return exam;
 };

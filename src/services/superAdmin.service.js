@@ -243,6 +243,16 @@ export const setAdminUnderReview = async (adminId, note, req) => {
     after:  { onboardingStatus: 'under_review', reviewNote: note || '' },
     statusCode: 200,
   });
+
+  notify({
+    recipientId: admin._id,
+    type: 'admin_under_review',
+    title: 'Account under review',
+    message: note
+      ? `Your account is being reviewed. ${note}`
+      : 'Your admin account is being reviewed. You will be notified once a decision is made.',
+  });
+
   return admin;
 };
 

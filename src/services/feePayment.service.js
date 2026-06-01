@@ -5,6 +5,7 @@ import { AppError } from '../errors/AppError.js';
 import { logAudit } from '../utils/audit.js';
 import { sendEmailNotification } from '../utils/email.js';
 import { sendSmsNotification } from '../utils/sms.js';
+import { notify, notifyMany } from '../utils/notify.js';
 
 async function generateReceiptNumber(instituteId) {
   const year = new Date().getFullYear();
@@ -76,6 +77,34 @@ export const recordPayment = async (studentId, { amount, method = 'cash', refere
 
   sendEmailNotification({ ...notifMeta, recipientEmail: student?.email }).catch(() => {});
   sendSmsNotification({ ...notifMeta, recipientPhone: student?.studentProfile?.mobileNumber }).catch(() => {});
+
+  const balanceMsg = studentFee.balance > 0
+    ? `Balance ${studentFee.balance.toLocaleString()} remaining.`
+    : 'Your fees are fully paid. Thank you!';
+  notify({
+    recipientId: studentId,
+    instituteId,
+    type: 'fee_payment',
+    title: 'Payment received',
+    message: `${payAmount.toLocaleString()} received (Receipt ${receiptNumber}). ${balanceMsg}`,
+    relatedEntity: { entityType: 'FeePayment', entityId: payment._id },
+  });
+
+  try {
+    const parents = await User.find({ role: 'parent', linkedStudents: studentId }, '_id').lean();
+    if (parents.length > 0) {
+      notifyMany({
+        recipientIds: parents.map((p) => p._id),
+        instituteId,
+        type: 'fee_payment',
+        title: `Payment received for ${student?.fullName ?? 'your child'}`,
+        message: `${payAmount.toLocaleString()} received (Receipt ${receiptNumber}). ${balanceMsg}`,
+        relatedEntity: { entityType: 'FeePayment', entityId: payment._id },
+      });
+    }
+  } catch {
+    /* ignore parent fanout failure */
+  }
 
   return { payment, receiptNumber };
 };

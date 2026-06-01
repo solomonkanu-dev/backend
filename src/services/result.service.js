@@ -9,6 +9,7 @@ import Result from '../models/Result.js';
 import { logAudit } from '../utils/audit.js';
 import { sendEmailNotification } from '../utils/email.js';
 import { sendSmsNotification } from '../utils/sms.js';
+import { notify, notifyMany } from '../utils/notify.js';
 
 const getInstituteId = (user) => user.institute?._id || user.institute;
 
@@ -112,6 +113,32 @@ export const assignMarks = async (body, req) => {
   sendEmailNotification({ ...notifMeta, recipientEmail: student.email }).catch(() => {});
   sendSmsNotification({ ...notifMeta, recipientPhone: student.studentProfile?.mobileNumber }).catch(() => {});
 
+  notify({
+    recipientId: studentId,
+    instituteId,
+    type: 'result_assigned',
+    title: 'New result',
+    message: `${subject.name}: ${finalMarks}/${effectiveTotalScore}${result.grade ? ` (grade ${result.grade})` : ''}`,
+    relatedEntity: { entityType: 'Result', entityId: result._id },
+  });
+
+  // Notify linked parents too
+  try {
+    const parents = await User.find({ role: 'parent', linkedStudents: studentId }, '_id').lean();
+    if (parents.length > 0) {
+      notifyMany({
+        recipientIds: parents.map((p) => p._id),
+        instituteId,
+        type: 'result_assigned',
+        title: `New result for ${student.fullName}`,
+        message: `${subject.name}: ${finalMarks}/${effectiveTotalScore}`,
+        relatedEntity: { entityType: 'Result', entityId: result._id, studentId },
+      });
+    }
+  } catch {
+    /* ignore parent fanout failure */
+  }
+
   return result;
 };
 
@@ -132,6 +159,47 @@ export const publishResults = async (classId, termId, req) => {
     after: { isPublished: true, count: modifiedCount, matchedCount },
     statusCode: 200,
   });
+
+  if (modifiedCount > 0) {
+    try {
+      const studentIds = await Result.distinct('student', {
+        class: classId,
+        term: termId,
+        institute: instituteId,
+        isPublished: true,
+      });
+      if (studentIds.length > 0) {
+        const msg = `Your ${term?.name ?? 'term'} results for ${cls?.name ?? 'your class'} are now available.`;
+        await notifyMany({
+          recipientIds: studentIds,
+          instituteId,
+          type: 'results_published',
+          title: 'Results published',
+          message: msg,
+          relatedEntity: { entityType: 'Class', entityId: classId, termId },
+        });
+
+        const { default: User } = await import('../models/user.js');
+        const parents = await User.find(
+          { role: 'parent', linkedStudents: { $in: studentIds } },
+          '_id'
+        ).lean();
+        if (parents.length > 0) {
+          await notifyMany({
+            recipientIds: parents.map((p) => p._id),
+            instituteId,
+            type: 'results_published',
+            title: 'Results published',
+            message: `${term?.name ?? 'Term'} results are now available for your child's class.`,
+            relatedEntity: { entityType: 'Class', entityId: classId, termId },
+          });
+        }
+      }
+    } catch {
+      /* ignore fanout failure */
+    }
+  }
+
   return { matched: matchedCount, modified: modifiedCount };
 };
 

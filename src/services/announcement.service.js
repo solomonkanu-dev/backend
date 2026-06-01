@@ -3,6 +3,55 @@ import * as announcementRepo from '../repositories/announcement.repository.js';
 import { logAudit } from '../utils/audit.js';
 import { sendEmailNotification } from '../utils/email.js';
 import { sendSmsNotification } from '../utils/sms.js';
+import { notifyMany, notifySuperAdmins } from '../utils/notify.js';
+
+// ─── Private: fanout in-app + push notifications to targeted users ──────────
+
+async function fanoutAnnouncementPush(announcement, requestingUser) {
+  try {
+    const { default: User } = await import('../models/user.js');
+    const instituteId =
+      announcement.type === 'institute_specific'
+        ? announcement.institute
+        : requestingUser.institute?._id || requestingUser.institute;
+
+    const roles = announcement.targetRoles ?? ['admin', 'lecturer', 'student'];
+
+    const filter = {
+      role: { $in: roles },
+      isActive: true,
+    };
+    if (announcement.type === 'institute_specific' && instituteId) {
+      filter.institute = instituteId;
+    }
+
+    const recipients = await User.find(filter).select('_id').lean();
+    const ids = recipients.map((u) => u._id);
+
+    if (ids.length > 0) {
+      await notifyMany({
+        recipientIds: ids,
+        instituteId: announcement.type === 'institute_specific' ? instituteId : null,
+        type: 'announcement',
+        title: announcement.title,
+        message: announcement.body,
+        relatedEntity: { entityType: 'Announcement', entityId: announcement._id },
+      });
+    }
+
+    // System-wide announcements should always reach super-admins too
+    if (announcement.type !== 'institute_specific') {
+      await notifySuperAdmins({
+        type: 'announcement',
+        title: announcement.title,
+        message: announcement.body,
+        relatedEntity: { entityType: 'Announcement', entityId: announcement._id },
+      });
+    }
+  } catch {
+    // never throws
+  }
+}
 
 // ─── Private: fire-and-forget email to targeted users ────────────────────────
 
@@ -91,6 +140,7 @@ export const createAnnouncement = async (body, req) => {
 
   // Fire-and-forget
   notifyAnnouncementByEmail(announcement, user).catch(() => {});
+  fanoutAnnouncementPush(announcement, user).catch(() => {});
 
   return announcement;
 };
