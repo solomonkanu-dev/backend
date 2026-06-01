@@ -1,6 +1,8 @@
 import { AppError } from "../errors/AppError.js";
 import * as repo from "../repositories/chat.repository.js";
 import { getIO } from "../socket.js";
+import User from "../models/user.js";
+import { sendExpoPushes } from "../utils/expoPush.js";
 
 // Emit a message event to all participants of a conversation
 function emitToParticipants(conv, event, payload) {
@@ -93,6 +95,37 @@ export const sendMessage = async (conversationId, senderId, content) => {
   // Real-time delivery via Socket.io
   emitToParticipants(conv, "new_message", { conversationId, message });
   emitToParticipants(conv, "conversation_updated", { conversationId });
+
+  // Native OS push to recipients other than the sender
+  (async () => {
+    try {
+      const recipientIds = conv.participants
+        .map((p) => p._id ?? p)
+        .filter((id) => String(id) !== String(senderId));
+      if (recipientIds.length === 0) return;
+
+      const recipients = await User.find(
+        { _id: { $in: recipientIds } },
+        "expoPushTokens"
+      ).lean();
+      const tokens = recipients.flatMap((u) => u.expoPushTokens || []);
+      if (tokens.length === 0) return;
+
+      const senderName = message.sender?.fullName || "New message";
+      const preview = message.content.length > 120
+        ? `${message.content.slice(0, 117)}…`
+        : message.content;
+      const isGroup = conv.type === "group" && conv.name;
+      await sendExpoPushes(tokens, {
+        title: isGroup ? `${conv.name} · ${senderName}` : senderName,
+        body: preview,
+        channelId: "messages",
+        data: { type: "message", conversationId: String(conversationId) },
+      });
+    } catch (err) {
+      console.warn("[chat] push send failed:", err?.message ?? err);
+    }
+  })();
 
   return message;
 };

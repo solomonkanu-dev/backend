@@ -1,6 +1,8 @@
 import * as repo from '../repositories/notification.repository.js';
 import { AppError } from '../errors/AppError.js';
 import { getIO } from '../socket.js';
+import User from '../models/user.js';
+import { isExpoPushToken } from '../utils/expoPush.js';
 
 export const getMyNotifications = async (userId, query) => {
   const page = parseInt(query.page) || 1;
@@ -57,4 +59,29 @@ export const deleteNotification = async (id, userId) => {
   if (io) {
     io.to(`user:${userId}`).emit('notification_deleted', { _id: id });
   }
+};
+
+export const registerPushToken = async (userId, token) => {
+  if (!token || typeof token !== 'string') {
+    throw new AppError('token is required', 400);
+  }
+  if (!isExpoPushToken(token)) {
+    throw new AppError('Invalid Expo push token', 400);
+  }
+  await User.updateOne(
+    { _id: userId },
+    { $addToSet: { expoPushTokens: token } }
+  );
+  return { token };
+};
+
+export const unregisterPushToken = async (userId, token) => {
+  if (!token || typeof token !== 'string') {
+    throw new AppError('token is required', 400);
+  }
+  await User.updateOne(
+    { _id: userId },
+    { $pull: { expoPushTokens: token } }
+  );
+  return { token };
 };

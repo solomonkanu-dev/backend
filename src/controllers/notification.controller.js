@@ -44,3 +44,21 @@ export const deleteNotification = async (req, res, next) => {
     next(err);
   }
 };
+
+export const registerPushToken = async (req, res, next) => {
+  try {
+    const data = await notificationService.registerPushToken(req.user._id, req.body?.token);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const unregisterPushToken = async (req, res, next) => {
+  try {
+    const data = await notificationService.unregisterPushToken(req.user._id, req.body?.token);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};

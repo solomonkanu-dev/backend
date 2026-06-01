@@ -162,6 +162,9 @@ const userSchema = new mongoose.Schema(
     // QR attendance
     qrToken: { type: String, default: null },
     qrActive: { type: Boolean, default: true },
+
+    // Expo push notification tokens (one per device, can be more than one)
+    expoPushTokens: { type: [String], default: [] },
   },
   { timestamps: true }
 );
