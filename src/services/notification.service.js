@@ -68,6 +68,14 @@ export const registerPushToken = async (userId, token) => {
   if (!isExpoPushToken(token)) {
     throw new AppError('Invalid Expo push token', 400);
   }
+  // A device's Expo push token is stable per install. If someone else was
+  // logged in before, their record still has this token and they would keep
+  // receiving pushes that belong to the new user. Detach the token from every
+  // other user first, then attach it to the current user.
+  await User.updateMany(
+    { _id: { $ne: userId }, expoPushTokens: token },
+    { $pull: { expoPushTokens: token } }
+  );
   await User.updateOne(
     { _id: userId },
     { $addToSet: { expoPushTokens: token } }
