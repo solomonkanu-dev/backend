@@ -3,6 +3,30 @@ import User from '../models/user.js';
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const EXPO_TOKEN_RE = /^ExponentPushToken\[[^\]]+\]$|^ExpoPushToken\[[^\]]+\]$/;
 
+/**
+ * Map our backend notification `type` to the matching Android channel + iOS
+ * category. Keep in sync with mobile lib/push/notifications.ts.
+ */
+const CHANNEL_BY_TYPE = {
+  message: 'messages',
+  announcement: 'announcements',
+  result_assigned: 'results',
+  results_published: 'results',
+  fee_assigned: 'fees',
+  fee_payment: 'fees',
+  exam_scheduled: 'exams',
+  calendar_event: 'calendar',
+  assignment_created: 'assignments',
+  absenceAlert: 'attendance',
+};
+
+const CATEGORY_BY_TYPE = {
+  message: 'chat-message',
+};
+
+export const channelForType = (type) => (type && CHANNEL_BY_TYPE[type]) || 'default';
+export const categoryForType = (type) => (type && CATEGORY_BY_TYPE[type]) || undefined;
+
 export const isExpoPushToken = (token) =>
   typeof token === 'string' && EXPO_TOKEN_RE.test(token);
 
@@ -23,15 +47,22 @@ export const sendExpoPushes = async (tokens, payload) => {
   const valid = [...new Set((tokens || []).filter(isExpoPushToken))];
   if (valid.length === 0) return [];
 
+  const type = payload.data?.type;
+  const channelId = payload.channelId ?? channelForType(type);
+  const categoryId = payload.categoryId ?? categoryForType(type);
+
   const messages = valid.map((to) => ({
     to,
     sound: payload.sound ?? 'default',
     title: payload.title,
     body: payload.body,
+    subtitle: payload.subtitle,
     data: payload.data || {},
-    channelId: payload.channelId,
+    channelId,
+    categoryId,
     badge: payload.badge,
     priority: payload.priority ?? 'high',
+    mutableContent: payload.mutableContent === true,
   }));
 
   const tickets = [];

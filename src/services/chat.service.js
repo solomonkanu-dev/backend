@@ -118,9 +118,18 @@ export const sendMessage = async (conversationId, senderId, content) => {
       const isGroup = conv.type === "group" && conv.name;
       await sendExpoPushes(tokens, {
         title: isGroup ? `${conv.name} · ${senderName}` : senderName,
+        subtitle: isGroup ? conv.name : undefined,
         body: preview,
-        channelId: "messages",
-        data: { type: "message", conversationId: String(conversationId) },
+        // mutableContent enables a future iOS Notification Service Extension
+        // (rich avatar/image) without requiring a backend change.
+        mutableContent: true,
+        data: {
+          type: "message",
+          conversationId: String(conversationId),
+          senderId: String(senderId),
+          senderName,
+          senderAvatar: message.sender?.profilePhoto ?? null,
+        },
       });
     } catch (err) {
       console.warn("[chat] push send failed:", err?.message ?? err);
