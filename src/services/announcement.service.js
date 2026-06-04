@@ -120,11 +120,22 @@ export const createAnnouncement = async (body, req) => {
     }
   }
 
+  const effectiveTargetRoles = (() => {
+    const base = new Set(targetRoles ?? ['admin', 'lecturer', 'student']);
+    if (user.role === 'admin') {
+      // Admin authors should reach every role in their institute except super-admins,
+      // including 'admin' so the author and peer admins also see the announcement.
+      base.add('admin');
+    }
+    base.delete('super_admin');
+    return Array.from(base);
+  })();
+
   const announcement = await announcementRepo.create({
     title,
     body: announcementBody,
     type: type || 'system_wide',
-    targetRoles: targetRoles || ['admin', 'lecturer', 'student'],
+    targetRoles: effectiveTargetRoles,
     institute: type === 'institute_specific' ? institute : null,
     createdBy: user._id,
     expiresAt: expiresAt || null,
