@@ -155,19 +155,32 @@ export const getAnnouncements = async (query, user) => {
   const filter = {
     isActive: true,
     $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
-    targetRoles: user.role,
   };
+
+  if (user.role === 'admin') {
+    // Admins should also see announcements they authored, even if 'admin' isn't a target role
+    filter.$and = [
+      {
+        $or: [
+          { targetRoles: 'admin' },
+          { createdBy: user._id },
+        ],
+      },
+    ];
+  } else {
+    filter.targetRoles = user.role;
+  }
 
   if (user.role !== 'super_admin') {
     const instituteId = user.institute?._id || user.institute;
-    filter.$and = [
+    filter.$and = (filter.$and || []).concat([
       {
         $or: [
           { type: 'system_wide' },
           { type: 'institute_specific', institute: instituteId },
         ],
       },
-    ];
+    ]);
   }
 
   const [announcements, total] = await Promise.all([
