@@ -10,39 +10,56 @@ const push = (recipientId, notification) => {
   }
 };
 
-export const notify = async ({ recipientId, instituteId, type, title, message, relatedEntity }) => {
+/**
+ * Persist a Notification document. If validation fails (e.g. unknown `type`
+ * not in the enum), log and return null so callers can still emit the push.
+ * Never throws.
+ */
+const persistOne = async (doc) => {
   try {
-    const notification = await Notification.create({
-      recipient: recipientId,
-      institute: instituteId || null,
-      type,
-      title,
-      message,
-      relatedEntity: relatedEntity || {},
-    });
-
-    push(recipientId, notification);
-
-    // Native OS push (fire-and-forget; resilient to offline devices)
-    sendExpoPushToUser(recipientId, {
-      title: title || 'EduSalone',
-      body: message || '',
-      data: { type, notificationId: String(notification._id), ...(relatedEntity || {}) },
-    }).catch(() => {});
-  } catch (_) {
-    // fire-and-forget, never throws
+    return await Notification.create(doc);
+  } catch (err) {
+    console.warn(
+      `[notify] persist failed type=${doc.type} recipient=${doc.recipient}: ${err?.message ?? err}`
+    );
+    return null;
   }
+};
+
+export const notify = async ({ recipientId, instituteId, type, title, message, relatedEntity }) => {
+  const notification = await persistOne({
+    recipient: recipientId,
+    institute: instituteId || null,
+    type,
+    title,
+    message,
+    relatedEntity: relatedEntity || {},
+  });
+
+  // Always emit the socket event and push, even if persistence failed (the
+  // user may still be online watching the bell, and the OS banner shouldn't
+  // be blocked by a schema mismatch).
+  if (notification) push(recipientId, notification);
+
+  sendExpoPushToUser(recipientId, {
+    title: title || 'EduSalone',
+    body: message || '',
+    data: {
+      type,
+      ...(notification ? { notificationId: String(notification._id) } : {}),
+      ...(relatedEntity || {}),
+    },
+  }).catch(() => {});
 };
 
 export const notifySuperAdmins = async ({ type, title, message, relatedEntity }) => {
   try {
-    const { default: User } = await import('../models/user.js');
     const superAdmins = await User.find({ role: 'super_admin' }, '_id expoPushTokens');
 
     const allTokens = [];
     await Promise.all(
       superAdmins.map(async (sa) => {
-        const notification = await Notification.create({
+        const notification = await persistOne({
           recipient: sa._id,
           institute: null,
           type,
@@ -50,8 +67,7 @@ export const notifySuperAdmins = async ({ type, title, message, relatedEntity })
           message,
           relatedEntity: relatedEntity || {},
         });
-
-        push(sa._id, notification);
+        if (notification) push(sa._id, notification);
         if (Array.isArray(sa.expoPushTokens)) allTokens.push(...sa.expoPushTokens);
       })
     );
@@ -63,7 +79,9 @@ export const notifySuperAdmins = async ({ type, title, message, relatedEntity })
         data: { type, ...(relatedEntity || {}) },
       }).catch(() => {});
     }
-  } catch (_) {}
+  } catch (err) {
+    console.warn('[notifySuperAdmins] failed:', err?.message ?? err);
+  }
 };
 
 /**
@@ -93,7 +111,20 @@ export const notifyMany = async ({
       relatedEntity: relatedEntity || {},
     }));
 
-    const notifications = await Notification.insertMany(docs, { ordered: false });
+    let notifications = [];
+    try {
+      notifications = await Notification.insertMany(docs, { ordered: false });
+    } catch (err) {
+      // With `ordered: false`, valid docs still land; the error may surface the
+      // failed-doc count via `err.insertedDocs` (mongoose) or
+      // `err.result.insertedIds` (driver). Capture whatever's there.
+      notifications = err?.insertedDocs ?? [];
+      console.warn(
+        `[notifyMany] insert had failures type=${type} ` +
+          `attempted=${docs.length} inserted=${notifications.length} ` +
+          `err=${err?.message ?? err}`
+      );
+    }
 
     const io = getIO();
     if (io) {
@@ -121,9 +152,11 @@ export const notifyMany = async ({
     }, {});
     console.log(
       `[notifyMany] type=${type} recipients=${uniqueIds.length} ` +
+        `persisted=${notifications.length} ` +
         `withTokens=${JSON.stringify(usersByRoleWithTokens)} ` +
         `withoutTokens=${JSON.stringify(usersByRoleWithoutTokens)}`
     );
+
     if (tokens.length === 0) return;
 
     sendExpoPushes(tokens, {
@@ -132,7 +165,7 @@ export const notifyMany = async ({
       channelId: pushChannelId,
       data: { type, ...(relatedEntity || {}) },
     }).catch(() => {});
-  } catch (_) {
-    // fire-and-forget
+  } catch (err) {
+    console.warn('[notifyMany] failed:', err?.message ?? err);
   }
 };

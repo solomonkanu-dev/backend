@@ -13,6 +13,7 @@ const notificationSchema = new mongoose.Schema(
         'fee_assigned',
         'assignment_created',
         'attendance_recorded',
+        'absenceAlert',
         'new_admin_signup',
         'institute_created',
         'plan_assigned',
